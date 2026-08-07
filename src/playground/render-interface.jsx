@@ -57,7 +57,7 @@ const handleClickAddonSettings = addonId => {
 
 const messages = defineMessages({
     defaultTitle: {
-        defaultMessage: 'Run Scratch projects faster',
+        defaultMessage: 'A better place to creative',
         description: 'Title of homepage',
         id: 'tw.guiDefaultTitle'
     }
@@ -159,7 +159,7 @@ const Footer = () => (
                     </a>
                 </div>
                 <div className={styles.footerSection}>
-                    <a href="https://scratch.mit.edu/users/GarboMuffin/#comments">
+                    <a href="https://scratch.mit.edu/users/katboizz/#comments">
                         <FormattedMessage
                             defaultMessage="Feedback & Bugs"
                             description="Link to feedback/bugs page"
@@ -341,7 +341,7 @@ class Interface extends React.Component {
                                 </p>
                             </div>
                             <div className={styles.section}>
-                                <FeaturedProjects studio="27205657" />
+                                <FeaturedProjects studio="51717143" />
                             </div>
                         </React.Fragment>
                     ) : null}

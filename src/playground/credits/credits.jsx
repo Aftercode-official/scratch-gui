@@ -61,8 +61,12 @@ const Credits = () => (
         </header>
         <section>
             <p>
-                The {APP_NAME} project is made possible by the work of many volunteers.
+                The {APP_NAME} project is a replacement for the Cookie IDE project.
             </p>
+        </section>
+       <section>
+            <h2>Developer</h2>
+            <UserList users={UserData.developers} />
         </section>
         {APP_NAME !== 'TurboWarp' && (
             // Be kind and considerate. Don't remove this :)
