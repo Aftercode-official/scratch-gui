@@ -3131,7 +3131,7 @@
         "blocks": {}
     },
     {
-        "name": "Dango Cat",
+        "name": "kat",
         "tags": [
             "food",
             "animals"
@@ -3141,7 +3141,7 @@
         "costumes": [
             {
                 "assetId": "927d672925e7b99f7813735c484c6922",
-                "name": "dango cat",
+                "name": "kat",
                 "bitmapResolution": 1,
                 "md5ext": "927d672925e7b99f7813735c484c6922.svg",
                 "dataFormat": "svg",
