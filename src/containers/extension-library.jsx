@@ -55,7 +55,7 @@ const fetchLibrary = async () => {
         extensionId: extension.id,
         extensionURL: `https://aftercode-extensions.vercel.app/${extension.slug}.js`,
         iconURL: `https://aftercode-extensions.vercel.app/${extension.image || 'images/unknown.svg'}`,
-        tags: ['tw'],
+        tags: ['ac'],
         credits: [
             ...(extension.original || []),
             ...(extension.by || [])
