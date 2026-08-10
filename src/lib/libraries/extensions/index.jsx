@@ -378,7 +378,7 @@ export default [
                 id="tw.customReporters.description"
             />
         ),
-        tags: ['tw'],
+        tags: ['ac','tw'],
         incompatibleWithScratch: true,
         featured: true
     },
@@ -403,7 +403,7 @@ export default [
             />
         ),
         incompatibleWithScratch: true,
-        tags: ['tw'],
+        tags: ['ac','tw'],
         featured: true
     },
     {
@@ -423,7 +423,7 @@ export default [
                 id="tw.customExtension.description"
             />
         ),
-        tags: ['tw'],
+        tags: ['ac','tw'],
         featured: true
         // Not marked as incompatible with Scratch so that clicking on it doesn't show a prompt
     }
@@ -451,7 +451,7 @@ export const galleryLoading = {
             id="tw.extensionGallery.loading"
         />
     ),
-    tags: ['tw'],
+    tags: ['ac','tw'],
     featured: true
 };
 
@@ -477,7 +477,7 @@ export const galleryMore = {
             id="tw.extensionGallery.more"
         />
     ),
-    tags: ['tw'],
+    tags: ['ac','tw'],
     featured: true
 };
 
@@ -503,6 +503,6 @@ export const galleryError = {
             id="tw.extensionGallery.error"
         />
     ),
-    tags: ['tw'],
+    tags: ['ac','tw'],
     featured: true
 };
