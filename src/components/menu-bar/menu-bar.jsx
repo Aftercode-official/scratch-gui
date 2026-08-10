@@ -34,7 +34,12 @@ import CloudVariablesToggler from '../../containers/tw-cloud-toggler.jsx';
 import TWSaveStatus from './tw-save-status.jsx';
 import TWNews from './tw-news.jsx';
 
-import {openTipsLibrary, openSettingsModal, openRestorePointModal} from '../../reducers/modals';
+import {
+    openTipsLibrary,
+    openSettingsModal,
+    openRestorePointModal,
+    openPluginModal
+} from '../../reducers/modals';
 import {setPlayer} from '../../reducers/mode';
 import {
     isTimeTravel220022BC,
@@ -905,6 +910,20 @@ class MenuBar extends React.Component {
                                 </span>
                             </div>
                         )}
+                        <div
+                            className={classNames(styles.menuBarItem, styles.hoverable)}
+                            onClick={this.props.onClickCustomPlugin}
+                        >
+                            <img
+                                src={addonsIcon}
+                                draggable={false}
+                                width={20}
+                                height={20}
+                            />
+                            <span className={styles.collapsibleLabel}>
+                                {'Aftercode Plugin'}
+                            </span>
+                        </div>
                         {this.props.onClickSettingsModal && (
                             <div
                                 className={classNames(styles.menuBarItem, styles.hoverable)}
@@ -1112,6 +1131,7 @@ MenuBar.propTypes = {
     ]),
     onClickAccount: PropTypes.func,
     onClickAddonSettings: PropTypes.func,
+    onClickCustomPlugin: PropTypes.func,
     onClickDesktopSettings: PropTypes.func,
     onClickPackager: PropTypes.func,
     onClickRestorePoints: PropTypes.func,
@@ -1215,6 +1235,7 @@ const mapDispatchToProps = dispatch => ({
     onRequestOpenAbout: () => dispatch(openAboutMenu()),
     onRequestCloseAbout: () => dispatch(closeAboutMenu()),
     onClickRestorePoints: () => dispatch(openRestorePointModal()),
+    onClickCustomPlugin: () => dispatch(openPluginModal()),
     onClickSettings: () => dispatch(openSettingsMenu()),
     onClickSettingsModal: () => {
         dispatch(closeEditMenu());

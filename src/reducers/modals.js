@@ -14,6 +14,7 @@ const MODAL_TIPS_LIBRARY = 'tipsLibrary';
 const MODAL_USERNAME = 'usernameModal';
 const MODAL_SETTINGS = 'settingsModal';
 const MODAL_CUSTOM_EXTENSION = 'customExtensionModal';
+const MODAL_PLUGIN = 'pluginModal';
 const MODAL_RESTORE_POINTS = 'restorePointModal';
 const MODAL_FONTS = 'fontsModal';
 const MODAL_UNKNOWN_PLATFORM = 'unknownPlatformModal';
@@ -33,6 +34,7 @@ const initialState = {
     [MODAL_USERNAME]: false,
     [MODAL_SETTINGS]: false,
     [MODAL_CUSTOM_EXTENSION]: false,
+    [MODAL_PLUGIN]: false,
     [MODAL_RESTORE_POINTS]: false,
     [MODAL_FONTS]: false,
     [MODAL_UNKNOWN_PLATFORM]: false,
@@ -105,6 +107,9 @@ const openSettingsModal = function () {
 const openCustomExtensionModal = function () {
     return openModal(MODAL_CUSTOM_EXTENSION);
 };
+const openPluginModal = function () {
+    return openModal(MODAL_PLUGIN);
+};
 const openRestorePointModal = function () {
     return openModal(MODAL_RESTORE_POINTS);
 };
@@ -156,6 +161,9 @@ const closeSettingsModal = function () {
 const closeCustomExtensionModal = function () {
     return closeModal(MODAL_CUSTOM_EXTENSION);
 };
+const closePluginModal = function () {
+    return closeModal(MODAL_PLUGIN);
+};
 const closeRestorePointModal = function () {
     return closeModal(MODAL_RESTORE_POINTS);
 };
@@ -184,6 +192,7 @@ export {
     openUsernameModal,
     openSettingsModal,
     openCustomExtensionModal,
+    openPluginModal,
     openRestorePointModal,
     openFontsModal,
     openUnknownPlatformModal,
@@ -201,6 +210,7 @@ export {
     closeUsernameModal,
     closeSettingsModal,
     closeCustomExtensionModal,
+    closePluginModal,
     closeRestorePointModal,
     closeFontsModal,
     closeUnknownPlatformModal,
