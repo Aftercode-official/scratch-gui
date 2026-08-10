@@ -176,7 +176,6 @@ class ExtensionLibrary extends React.PureComponent {
                 library.push(toLibraryItem(galleryLoading));
             }
         }
-
         return (
             <LibraryComponent
                 data={library}
