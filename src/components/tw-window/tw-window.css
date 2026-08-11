@@ -1,19 +1,24 @@
 @import "../../css/colors.css";
 
 .modal-content {
-    width: min(680px, calc(100vw - 32px));
-    min-height: 360px;
+    display: flex;
+    width: 680px;
+    max-width: calc(100vw - 32px);
+    height: 460px;
+    max-height: calc(100vh - 32px);
+    margin: 16px auto;
     border: 1px solid #39424e;
     border-radius: 8px;
     background-color: #11161c;
+    overflow-y: auto;
     box-shadow: 0 18px 45px rgba(0, 0, 0, .45);
     color: #d7e2ea;
     font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
 }
 
 .body {
-    position: relative;
-    min-height: 300px;
+    height: calc(100% - 64px);
+    min-height: 0;
     padding: 22px 24px;
     overflow: auto;
     background-color: #11161c;
@@ -22,39 +27,44 @@
     line-height: 1.6;
 }
 
-.body::before {
-    display: block;
-    margin-bottom: 18px;
-    color: #6ee7b7;
-    content: "aftercode@Scratch:~$ terminal ready";
+.output {
+     min-height: 0;
+     max-height: calc(100% - 42px);
+     overflow-y: auto;
     white-space: pre-wrap;
+    word-break: break-word;
 }
 
-.body::after {
-    display: block;
+.command-line {
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
     margin-top: 18px;
     color: #6ee7b7;
-    content: "aftercode@Scratch:~$ _";
-    animation: terminal-cursor 1s steps(2, jump-none) infinite;
 }
 
-@keyframes terminal-cursor {
-    0%, 45% {
-        opacity: 1;
-    }
-
-    46%, 100% {
-        opacity: .25;
-    }
+.command-line input {
+    flex: 1;
+    min-width: 0;
+    border: 0;
+    outline: 0;
+    padding: 0;
+    background: transparent;
+    color: #f8fafc;
+    font: inherit;
 }
 
 @media (max-width: 480px) {
     .modal-content {
-        min-height: 300px;
+        width: calc(100vw - 20px);
+        max-width: calc(100vw - 20px);
+        height: calc(100vh - 20px);
+        max-height: calc(100vh - 20px);
+        margin: 10px auto;
     }
 
     .body {
-        min-height: 240px;
+        height: calc(100% - 64px);
         padding: 18px;
         font-size: .75rem;
     }
