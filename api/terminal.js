@@ -30,7 +30,22 @@ module.exports = (request, response) => {
     let output;
     switch (name) {
     case 'help':
-        output = `Available commands: ${commands.join(', ')}`;
+        output = [
+            'Project commands are available in the Scratch GUI:',
+            '  run, greenflag  Start the Scratch project',
+            '  stop             Stop all running scripts',
+            '  project          Show project targets',
+            '  sprites          List project sprites',
+            '',
+            'Hosted terminal commands:',
+            '  clear            Clear terminal output',
+            '  echo <text>      Print text',
+            '  date             Show date and time',
+            '  pwd              Show hosted project path',
+            '  whoami           Show terminal user',
+            '  ls               List hosted files',
+            '  help             Show this command list'
+        ].join('\n');
         break;
     case 'echo':
         output = args.join(' ');

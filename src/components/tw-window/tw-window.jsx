@@ -63,6 +63,15 @@ class WindowModal extends React.Component {
         }
 
         const [name] = command.split(/\s+/);
+        if (name.toLowerCase() === 'help') {
+            this.setState({
+                command: '',
+                history: [...this.state.history, command],
+                historyIndex: this.state.history.length + 1,
+                output: [...this.state.output, `${this.prompt()} ${command}`, this.helpText()]
+            });
+            return;
+        }
         const projectOutput = this.runProjectCommand(name.toLowerCase());
         if (projectOutput !== null) {
             this.setState({
@@ -122,6 +131,25 @@ class WindowModal extends React.Component {
             return sprites || 'No sprites.';
         }
         return null;
+    }
+
+    helpText () {
+        return [
+            'Project commands:',
+            '  run, greenflag  Start the Scratch project',
+            '  stop             Stop all running scripts',
+            '  project          Show the number of project targets',
+            '  sprites          List the sprites in the project',
+            '',
+            'Terminal commands:',
+            '  clear            Clear the terminal output',
+            '  echo <text>      Print text',
+            '  date             Show the current date and time',
+            '  pwd              Show the hosted project path',
+            '  whoami           Show the current terminal user',
+            '  ls               List hosted project files',
+            '  help             Show this command list'
+        ].join('\n');
     }
 
     prompt () {
