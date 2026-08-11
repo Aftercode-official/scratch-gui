@@ -3,7 +3,6 @@ import React from 'react';
 import {connect} from 'react-redux';
 
 import {closePluginModal} from '../reducers/modals';
-import {manuallyTrustExtension} from './tw-security-manager.jsx';
 import PluginModalComponent from '../components/tw-plugin-modal/plugin-modal.jsx';
 
 class PluginModal extends React.Component {
@@ -36,9 +35,10 @@ class PluginModal extends React.Component {
         try {
             for (const file of Array.from(this.state.files)) {
                 const source = await file.text();
-                const url = `data:application/javascript,${encodeURIComponent(source)}`;
-                manuallyTrustExtension(url);
-                await this.props.vm.extensionManager.loadExtensionURL(url);
+                const script = document.createElement('script');
+                script.textContent = source;
+                document.head.appendChild(script);
+                script.remove();
             }
             this.props.onClose();
         } catch (error) {
@@ -64,23 +64,13 @@ class PluginModal extends React.Component {
 }
 
 PluginModal.propTypes = {
-    onClose: PropTypes.func,
-    vm: PropTypes.shape({
-        extensionManager: PropTypes.shape({
-            loadExtensionURL: PropTypes.func
-        })
-    })
+    onClose: PropTypes.func
 };
-
-const mapStateToProps = state => ({
-    vm: state.scratchGui.vm
-});
 
 const mapDispatchToProps = dispatch => ({
     onClose: () => dispatch(closePluginModal())
 });
 
 export default connect(
-    mapStateToProps,
     mapDispatchToProps
 )(PluginModal);

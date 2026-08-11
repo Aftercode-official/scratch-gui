@@ -25,7 +25,7 @@ const PluginModal = props => (
                 disabled={!props.canLoad}
                 onClick={props.onLoad}
             >
-                {props.loading ? 'Loading...' : 'Load plugin'}
+                {props.loading ? 'Running...' : 'Run plugin'}
             </button>
         </div>
     </Modal>
