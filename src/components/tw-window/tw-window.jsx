@@ -62,6 +62,18 @@ class WindowModal extends React.Component {
             return;
         }
 
+        const [name] = command.split(/\s+/);
+        const projectOutput = this.runProjectCommand(name.toLowerCase());
+        if (projectOutput !== null) {
+            this.setState({
+                command: '',
+                history: [...this.state.history, command],
+                historyIndex: this.state.history.length + 1,
+                output: [...this.state.output, `${this.prompt()} ${command}`, projectOutput]
+            });
+            return;
+        }
+
         this.setState({
             command: '',
             history: [...this.state.history, command],
@@ -87,6 +99,29 @@ class WindowModal extends React.Component {
                 output: [...prevState.output, `Terminal server unavailable: ${error.message}`]
             }));
         }
+    }
+
+    runProjectCommand (name) {
+        if (name === 'run' || name === 'greenflag') {
+            this.props.vm.start();
+            this.props.vm.greenFlag();
+            return 'Project started.';
+        }
+        if (name === 'stop') {
+            this.props.vm.stopAll();
+            return 'Project stopped.';
+        }
+        if (name === 'project') {
+            return `Project targets: ${this.props.vm.runtime.targets.length}`;
+        }
+        if (name === 'sprites') {
+            const sprites = this.props.vm.runtime.targets
+                .filter(target => !target.isStage)
+                .map(target => target.getName())
+                .join(', ');
+            return sprites || 'No sprites.';
+        }
+        return null;
     }
 
     prompt () {
@@ -124,7 +159,15 @@ class WindowModal extends React.Component {
 }
 
 WindowModal.propTypes = {
-    onClose: PropTypes.func.isRequired
+    onClose: PropTypes.func.isRequired,
+    vm: PropTypes.shape({
+        greenFlag: PropTypes.func.isRequired,
+        runtime: PropTypes.shape({
+            targets: PropTypes.array.isRequired
+        }).isRequired,
+        start: PropTypes.func.isRequired,
+        stopAll: PropTypes.func.isRequired
+    }).isRequired
 };
 
 export default WindowModal;
