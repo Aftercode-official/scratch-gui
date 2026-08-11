@@ -132,9 +132,9 @@ const Footer = () => (
                         {/* Do not translate */}
                         {'TurboWarp Desktop'}
                     </a>
-                    <a href="https://packager.turbowarp.org/">
+                    <a href="https://aftercode-packager.vercel.app/">
                         {/* Do not translate */}
-                        {'TurboWarp Packager'}
+                        {'Aftercode Packager'}
                     </a>
                     <a href="https://docs.turbowarp.org/embedding">
                         <FormattedMessage

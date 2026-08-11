@@ -43,12 +43,12 @@ const messages = defineMessages({
 
 const Packager = () => (
     <a
-        href="https://packager.turbowarp.org"
+        href="https://aftercode-packager.vercel.app/"
         target="_blank"
         rel="noopener noreferrer"
     >
         {/* Should not be translated */}
-        {'TurboWarp Packager'}
+        {'Aftercode Packager'}
     </a>
 );
 
