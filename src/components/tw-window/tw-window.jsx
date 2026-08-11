@@ -70,7 +70,7 @@ class WindowModal extends React.Component {
         });
 
         try {
-            const response = await fetch('http://127.0.0.1:8787/api/terminal', {
+            const response = await fetch('/api/terminal', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'
