@@ -13,7 +13,7 @@ const PluginModal = props => (
         onRequestClose={props.onClose}
     >
         <div className={styles.body}>
-            <h2>{'Upload custom plugin'}</h2>
+            <p>{'Upload file.js custom plugin'}</p>
             <FileInput
                 accept=".js,application/javascript"
                 files={props.files}
