@@ -54,19 +54,19 @@ module.exports = (request, response) => {
         output = new Date().toString();
         break;
     case 'pwd':
-        output = '/vercel/project';
+        output = 'nothing';
         break;
     case 'whoami':
-        output = 'vercel-user';
+        output = 'nothing';
         break;
     case 'ls':
-        output = 'build  public  api';
+        output = 'nothing';
         break;
     case 'clear':
-        output = '';
+        output = 'blank';
         break;
     default:
-        output = '';
+        output = 'blank';
     }
 
     return responseJson(response, 200, {
