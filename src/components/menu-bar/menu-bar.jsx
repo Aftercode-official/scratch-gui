@@ -38,8 +38,7 @@ import {
     openTipsLibrary,
     openSettingsModal,
     openRestorePointModal,
-    openPluginModal,
-    openWindowModal
+    openPluginModal
 } from '../../reducers/modals';
 import {setPlayer} from '../../reducers/mode';
 import {
@@ -563,7 +562,6 @@ class MenuBar extends React.Component {
                                 this.props.onClickAddonSettings &&
                                 this.props.onClickAddonSettings.bind(null, 'editor-theme3')
                             }
-                            onOpenWindowModal={this.props.onClickWindowModal}
                             onRequestClose={this.props.onRequestCloseSettings}
                             onRequestOpen={this.props.onClickSettings}
                             settingsMenuOpen={this.props.settingsMenuOpen}
@@ -1240,7 +1238,6 @@ const mapDispatchToProps = dispatch => ({
     onClickRestorePoints: () => dispatch(openRestorePointModal()),
     onClickCustomPlugin: () => dispatch(openPluginModal()),
     onClickSettings: () => dispatch(openSettingsMenu()),
-    onClickWindowModal: () => dispatch(openWindowModal()),
     onClickSettingsModal: () => {
         dispatch(closeEditMenu());
         dispatch(openSettingsModal());
