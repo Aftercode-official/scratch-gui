@@ -4,7 +4,7 @@ import {FormattedMessage} from 'react-intl';
 
 import LanguageMenu from './language-menu.jsx';
 import MenuBarMenu from './menu-bar-menu.jsx';
-import {MenuSection} from '../menu/menu.jsx';
+import {MenuItem, MenuSection} from '../menu/menu.jsx';
 import MenuLabel from './tw-menu-label.jsx';
 import TWAccentThemeMenu from './tw-theme-accent.jsx';
 import TWGuiThemeMenu from './tw-theme-gui.jsx';
@@ -22,6 +22,7 @@ const SettingsMenu = ({
     canChangeTheme,
     isRtl,
     onClickDesktopSettings,
+    onOpenCustomAccent,
     onOpenCustomSettings,
     onRequestClose,
     onRequestOpen,
@@ -67,6 +68,11 @@ const SettingsMenu = ({
                         <TWAccentThemeMenu />
                     </React.Fragment>
                 )}
+                {onOpenCustomAccent && (
+                    <MenuItem onClick={onOpenCustomAccent}>
+                        {'Custom accent'}
+                    </MenuItem>
+                )}
                 {onClickDesktopSettings && <TWDesktopSettings onClick={onClickDesktopSettings} />}
             </MenuSection>
         </MenuBarMenu>
@@ -78,6 +84,7 @@ SettingsMenu.propTypes = {
     canChangeTheme: PropTypes.bool,
     isRtl: PropTypes.bool,
     onClickDesktopSettings: PropTypes.func,
+    onOpenCustomAccent: PropTypes.func,
     onOpenCustomSettings: PropTypes.func,
     onRequestClose: PropTypes.func,
     onRequestOpen: PropTypes.func,

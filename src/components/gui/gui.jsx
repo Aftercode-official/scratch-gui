@@ -34,6 +34,7 @@ import TWSettingsModal from '../../containers/tw-settings-modal.jsx';
 import TWSecurityManager from '../../containers/tw-security-manager.jsx';
 import TWCustomExtensionModal from '../../containers/tw-custom-extension-modal.jsx';
 import TWPluginModal from '../../containers/tw-plugin-modal.jsx';
+import TWCustomAccentModal from '../../containers/customAccent-modal.jsx';
 import TWRestorePointManager from '../../containers/tw-restore-point-manager.jsx';
 import TWFontsModal from '../../containers/tw-fonts-modal.jsx';
 import TWUnknownPlatformModal from '../../containers/tw-unknown-platform-modal.jsx';
@@ -157,6 +158,7 @@ const GUIComponent = props => {
         settingsModalVisible,
         customExtensionModalVisible,
         pluginModalVisible,
+        customAccentModalVisible,
         fontsModalVisible,
         unknownPlatformModalVisible,
         invalidProjectModalVisible,
@@ -192,6 +194,7 @@ const GUIComponent = props => {
                 {settingsModalVisible && <TWSettingsModal />}
                 {customExtensionModalVisible && <TWCustomExtensionModal />}
                 {pluginModalVisible && <TWPluginModal />}
+                {customAccentModalVisible && <TWCustomAccentModal />}
                 {fontsModalVisible && <TWFontsModal />}
                 {unknownPlatformModalVisible && <TWUnknownPlatformModal />}
                 {invalidProjectModalVisible && <TWInvalidProjectModal />}
@@ -541,6 +544,7 @@ GUIComponent.propTypes = {
     settingsModalVisible: PropTypes.bool,
     customExtensionModalVisible: PropTypes.bool,
     pluginModalVisible: PropTypes.bool,
+    customAccentModalVisible: PropTypes.bool,
     fontsModalVisible: PropTypes.bool,
     unknownPlatformModalVisible: PropTypes.bool,
     invalidProjectModalVisible: PropTypes.bool,

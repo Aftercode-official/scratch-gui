@@ -7,7 +7,16 @@ import {connect} from 'react-redux';
 import check from './check.svg';
 import dropdownCaret from './dropdown-caret.svg';
 import {MenuItem, Submenu} from '../menu/menu.jsx';
-import {ACCENT_BLUE, ACCENT_MAP, ACCENT_PURPLE, ACCENT_RED, ACCENT_RAINBOW, ACCENT_YELLOW, Theme} from '../../lib/themes/index.js';
+import {
+    ACCENT_BLUE,
+    ACCENT_CUSTOM,
+    ACCENT_MAP,
+    ACCENT_PURPLE,
+    ACCENT_RAINBOW,
+    ACCENT_RED,
+    ACCENT_YELLOW,
+    Theme
+} from '../../lib/themes/index.js';
 import {openAccentMenu, accentMenuOpen, closeSettingsMenu} from '../../reducers/menus.js';
 import {setTheme} from '../../reducers/theme.js';
 import {persistTheme} from '../../lib/themes/themePersistance.js';
@@ -39,15 +48,25 @@ const options = defineMessages({
         defaultMessage: 'Yellow',
         description: 'Name of the yellow color scheme.',
         id: 'tw.accent.yellow'
+    },
+    [ACCENT_CUSTOM]: {
+        defaultMessage: 'Custom',
+        description: 'Name of the user-selected custom accent color.',
+        id: 'tw.accent.custom'
     }
 });
 
 const icons = {
-    [ACCENT_RAINBOW]: rainbowIcon,
+    [ACCENT_RAINBOW]: rainbowIcon
 };
 
 const ColorIcon = props => (
-    icons[props.id] ? (
+    props.id === ACCENT_CUSTOM ? (
+        <div
+            className={styles.accentIconOuter}
+            style={{backgroundColor: props.customAccent.guiColors['looks-secondary']}}
+        />
+    ) : icons[props.id] ? (
         <img
             className={styles.accentIconOuter}
             src={icons[props.id]}
@@ -68,6 +87,9 @@ const ColorIcon = props => (
 );
 
 ColorIcon.propTypes = {
+    customAccent: PropTypes.shape({
+        guiColors: PropTypes.object.isRequired
+    }),
     id: PropTypes.string
 };
 
@@ -81,19 +103,26 @@ const AccentMenuItem = props => (
                 src={check}
                 draggable={false}
             />
-            <ColorIcon id={props.id} />
+            <ColorIcon
+                customAccent={props.customAccent}
+                id={props.id}
+            />
             <FormattedMessage {...options[props.id]} />
         </div>
     </MenuItem>
 );
 
 AccentMenuItem.propTypes = {
+    customAccent: PropTypes.shape({
+        guiColors: PropTypes.object.isRequired
+    }),
     id: PropTypes.string,
     isSelected: PropTypes.bool,
     onClick: PropTypes.func
 };
 
 const AccentThemeMenu = ({
+    customAccent,
     isOpen,
     isRtl,
     onChangeTheme,
@@ -105,7 +134,10 @@ const AccentThemeMenu = ({
             className={styles.option}
             onClick={onOpen}
         >
-            <ColorIcon id={theme.accent} />
+            <ColorIcon
+                customAccent={customAccent}
+                id={theme.accent}
+            />
             <span className={styles.submenuLabel}>
                 <FormattedMessage
                     defaultMessage="Accent"
@@ -120,13 +152,25 @@ const AccentThemeMenu = ({
             />
         </div>
         <Submenu place={isRtl ? 'left' : 'right'}>
-            {Object.keys(options).map(item => (
+            {[
+                ACCENT_RED,
+                ACCENT_PURPLE,
+                ACCENT_BLUE,
+                ACCENT_RAINBOW,
+                ACCENT_YELLOW,
+                ...(customAccent ? [ACCENT_CUSTOM] : [])
+            ].map(item => (
                 <AccentMenuItem
                     key={item}
+                    customAccent={customAccent}
                     id={item}
                     isSelected={theme.accent === item}
                     // eslint-disable-next-line react/jsx-no-bind
-                    onClick={() => onChangeTheme(theme.set('accent', item))}
+                    onClick={() => onChangeTheme(
+                        item === ACCENT_CUSTOM ?
+                            theme.set('accent', customAccent) :
+                            theme.set('accent', item)
+                    )}
                 />
             ))}
         </Submenu>
@@ -134,6 +178,9 @@ const AccentThemeMenu = ({
 );
 
 AccentThemeMenu.propTypes = {
+    customAccent: PropTypes.shape({
+        guiColors: PropTypes.object.isRequired
+    }),
     isOpen: PropTypes.bool,
     isRtl: PropTypes.bool,
     onChangeTheme: PropTypes.func,
@@ -142,6 +189,7 @@ AccentThemeMenu.propTypes = {
 };
 
 const mapStateToProps = state => ({
+    customAccent: state.scratchGui.theme.theme.customAccent,
     isOpen: accentMenuOpen(state),
     isRtl: state.locales.isRtl,
     theme: state.scratchGui.theme.theme

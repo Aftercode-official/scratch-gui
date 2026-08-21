@@ -82,7 +82,7 @@ const persistTheme = theme => {
     const nonDefaultSettings = {};
 
     if (theme.accent !== systemPreferences.accent) {
-        nonDefaultSettings.accent = theme.accent;
+        nonDefaultSettings.accent = theme.customAccent || theme.accent;
     }
     if (theme.gui !== systemPreferences.gui) {
         nonDefaultSettings.gui = theme.gui;

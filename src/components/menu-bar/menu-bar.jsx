@@ -38,7 +38,8 @@ import {
     openTipsLibrary,
     openSettingsModal,
     openRestorePointModal,
-    openPluginModal
+    openPluginModal,
+    openCustomAccentModal
 } from '../../reducers/modals';
 import {setPlayer} from '../../reducers/mode';
 import {
@@ -346,9 +347,9 @@ class MenuBar extends React.Component {
         if (modifier) {
             if (event.key.toLowerCase() === 's') {
                 this.props.handleSaveProject();
-                event.preventDefault();    
+                event.preventDefault();
             } else if (event.key.toLowerCase() === 'o') {
-                event.preventDefault();    
+                event.preventDefault();
                 this.props.onStartSelectingFileUpload();
             }
         }
@@ -562,6 +563,7 @@ class MenuBar extends React.Component {
                                 this.props.onClickAddonSettings &&
                                 this.props.onClickAddonSettings.bind(null, 'editor-theme3')
                             }
+                            onOpenCustomAccent={this.props.onClickCustomAccent}
                             onRequestClose={this.props.onRequestCloseSettings}
                             onRequestOpen={this.props.onClickSettings}
                             settingsMenuOpen={this.props.settingsMenuOpen}
@@ -1131,6 +1133,7 @@ MenuBar.propTypes = {
     ]),
     onClickAccount: PropTypes.func,
     onClickAddonSettings: PropTypes.func,
+    onClickCustomAccent: PropTypes.func,
     onClickCustomPlugin: PropTypes.func,
     onClickDesktopSettings: PropTypes.func,
     onClickPackager: PropTypes.func,
@@ -1146,7 +1149,6 @@ MenuBar.propTypes = {
     onClickSaveAsCopy: PropTypes.func,
     onClickSettings: PropTypes.func,
     onClickSettingsModal: PropTypes.func,
-    onClickWindowModal: PropTypes.func,
     onLogOut: PropTypes.func,
     onOpenRegistration: PropTypes.func,
     onOpenTipLibrary: PropTypes.func,
@@ -1237,6 +1239,7 @@ const mapDispatchToProps = dispatch => ({
     onRequestCloseAbout: () => dispatch(closeAboutMenu()),
     onClickRestorePoints: () => dispatch(openRestorePointModal()),
     onClickCustomPlugin: () => dispatch(openPluginModal()),
+    onClickCustomAccent: () => dispatch(openCustomAccentModal()),
     onClickSettings: () => dispatch(openSettingsMenu()),
     onClickSettingsModal: () => {
         dispatch(closeEditMenu());
