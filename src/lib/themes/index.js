@@ -31,14 +31,14 @@ const ACCENT_DEFAULT = ACCENT_YELLOW;
 const createCustomAccent = color => ({
     color,
     guiColors: {
-        'ui-primary': `${color}12`,
-        'ui-secondary': `${color}1c`,
-        'ui-tertiary': `${color}30`,
+        'ui-primary': `${color}26`,
+        'ui-secondary': `${color}40`,
+        'ui-tertiary': `${color}66`,
         'ui-modal-header-background': color,
         'badge-background': `${color}26`,
         'badge-border': `${color}59`,
         'fullscreen-accent': `${color}26`,
-        'page-background': `${color}08`,
+        'page-background': `${color}1a`,
         'link-color': color,
         'motion-primary': color,
         'motion-primary-transparent': `${color}e6`,
