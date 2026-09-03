@@ -1,0 +1,34 @@
+# Mac OS
+.DS_Store
+
+# NPM & Dependencies (Dùng **/ để chặn node_modules ở mọi cấp thư mục)
+**/node_modules/
+npm-*
+
+# External Projects / Submodules gây tràn index
+scratch-blocks/
+closure-library/
+
+# Testing
+/.nyc_output
+/coverage
+
+# Build
+/build
+/dist
+/.opt-in
+
+# Generated translation files
+/translations
+/locale
+
+# Other generated source
+/src/generated
+
+# Downloaded during "npm install"
+/static/microbit
+
+# Environment & Configs
+.secrets
+.env*
+.vercel
