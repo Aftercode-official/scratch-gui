@@ -1119,7 +1119,7 @@ async handleClickUploadProject () {
                             {/* todo: icon */}
                             <Button className={styles.feedbackButton}>
                                 <FormattedMessage
-                                    defaultMessage="TurboWarp Feedback"
+                                    defaultMessage="Aftercode Feedback"
                                     description="Button to give feedback in the menu bar"
                                     id="tw.feedbackButton"
                                     values={{
