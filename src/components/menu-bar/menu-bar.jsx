@@ -397,6 +397,7 @@ class MenuBar extends React.Component {
 async handleClickUploadProject () {
     try {
         // 1. Mở tab trước để trình duyệt không chặn Popup
+        const LOGO_URL = 'https://i.ibb.co/9mhxsQM2/ezgif-1b203d38782d98f9.png';
         const targetUrl = "https://danvpr.github.io/workshop/#upload";
         const workshopTab = window.open(targetUrl, "_blank");
 
@@ -1130,11 +1131,16 @@ async handleClickUploadProject () {
                     </div>
                     <div className={styles.menuBarItem}>
                             <Button
-                                className={styles.uploadProjectButton}
+                            className={styles.uploadProjectButton}
                                 onClick={this.handleClickUploadProject}
                             >
+                                <img
+                                    src="https://i.ibb.co/9mhxsQM2/ezgif-1b203d38782d98f9.png"
+                                    draggable={false}
+                                    className={styles.uploadProjectIcon}
+                                />
                                 <FormattedMessage
-                                    defaultMessage="Upload Project to DANVworkshop"
+                                    defaultMessage="Chia sẻ lên DANVworkshop"
                                     description="Button to upload a project"
                                     id="tw.uploadProjectButton"
                                 />
