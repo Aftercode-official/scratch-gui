@@ -62,8 +62,7 @@ const base = {
         symlinks: false,
         alias: {
             'text-encoding$': path.resolve(__dirname, 'src/lib/tw-text-encoder'),
-            'scratch-render-fonts$': path.resolve(__dirname, 'src/lib/tw-scratch-render-fonts'),
-            'scratch-blocks$': path.resolve(__dirname, 'node_modules/scratch-blocks/dist/web/blockly_compressed_vertical.js')
+            'scratch-render-fonts$': path.resolve(__dirname, 'src/lib/tw-scratch-render-fonts')
         }
     },
     module: {
