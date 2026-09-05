@@ -4,10 +4,6 @@
   "outputDirectory": "build",
   "rewrites": [
     {
-      "source": "/googleb5a5b70154a33f24.html",
-      "destination": "/static/googleb5a5b70154a33f24.html"
-    },
-    {
       "source": "/(.*)",
       "destination": "/index.html"
     }
