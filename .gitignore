@@ -1,9 +1,13 @@
 # Mac OS
 .DS_Store
 
-# NPM
-/node_modules
+# NPM & Dependencies (Dùng **/ để chặn node_modules ở mọi cấp thư mục)
+**/node_modules/
 npm-*
+
+# External Projects / Submodules gây tràn index
+scratch-blocks/
+closure-library/
 
 # Testing
 /.nyc_output
@@ -24,14 +28,19 @@ npm-*
 # Downloaded during "npm install"
 /static/microbit
 
-# for act
+# Environment & Configs
 .secrets
-
-.vercel
 .env*
+<<<<<<< HEAD
 
 .vercel
 
 .vercel
+<<<<<<< HEAD
 
 .vercel
+=======
+=======
+.vercel
+>>>>>>> 7d2013153989b81bde76cc1616e26f7fd204263d
+>>>>>>> 7f3541e7535bab90901a8ba8ebe1c5c4ce4dce64
