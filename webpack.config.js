@@ -63,7 +63,7 @@ const base = {
         alias: {
             'text-encoding$': path.resolve(__dirname, 'src/lib/tw-text-encoder'),
             'scratch-render-fonts$': path.resolve(__dirname, 'src/lib/tw-scratch-render-fonts'),
-            'scratch-blocks$': path.resolve(__dirname, 'node_modules/scratch-blocks/media/scratch-blocks')
+            'scratch-blocks$': path.resolve(__dirname, 'node_modules/scratch-blocks')
         }
     },
     module: {
