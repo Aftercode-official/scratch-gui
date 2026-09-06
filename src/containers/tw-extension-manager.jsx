@@ -13,6 +13,8 @@ class ExtensionManager extends React.Component {
             error: null
         };
         this.handleRefresh = this.handleRefresh.bind(this);
+        this.handleRemove = this.handleRemove.bind(this);
+        this.handleRemoveAll = this.handleRemoveAll.bind(this);
     }
 
     componentDidMount () {
@@ -31,12 +33,32 @@ class ExtensionManager extends React.Component {
         }
     }
 
+    handleRemove (extensionId) {
+        try {
+            this.props.vm.extensionManager.unloadExtension(extensionId);
+            this.handleRefresh();
+        } catch (error) {
+            this.setState({error: error.message || String(error)});
+        }
+    }
+
+    handleRemoveAll () {
+        try {
+            this.props.vm.extensionManager.unloadAllExtensions();
+            this.handleRefresh();
+        } catch (error) {
+            this.setState({error: error.message || String(error)});
+        }
+    }
+
     render () {
         return (
             <ExtensionmanagerModal
                 error={this.state.error}
                 extensions={this.state.extensions}
                 onClose={this.props.onClose}
+                onRemove={this.handleRemove}
+                onRemoveAll={this.handleRemoveAll}
                 onRefresh={this.handleRefresh}
             />
         );
@@ -45,10 +67,11 @@ class ExtensionManager extends React.Component {
 
 ExtensionManager.propTypes = {
     onClose: PropTypes.func,
-    onLoadCustom: PropTypes.func,
     vm: PropTypes.shape({
         extensionManager: PropTypes.shape({
-            getExtensionURLs: PropTypes.func
+            getExtensionURLs: PropTypes.func,
+            unloadAllExtensions: PropTypes.func,
+            unloadExtension: PropTypes.func
         })
     })
 };

@@ -115,6 +115,7 @@ class Blocks extends React.Component {
             'onBlockGlowOff',
             'handleMonitorsUpdate',
             'handleExtensionAdded',
+            'handleExtensionRemoved',
             'handleBlocksInfoUpdate',
             'onTargetsUpdate',
             'onVisualReport',
@@ -366,6 +367,7 @@ class Blocks extends React.Component {
         this.props.vm.addListener('targetsUpdate', this.onTargetsUpdate);
         this.props.vm.addListener('MONITORS_UPDATE', this.handleMonitorsUpdate);
         this.props.vm.addListener('EXTENSION_ADDED', this.handleExtensionAdded);
+        this.props.vm.addListener('EXTENSION_REMOVED', this.handleExtensionRemoved);
         this.props.vm.addListener('BLOCKSINFO_UPDATE', this.handleBlocksInfoUpdate);
         this.props.vm.addListener('PERIPHERAL_CONNECTED', this.handleStatusButtonUpdate);
         this.props.vm.addListener('PERIPHERAL_DISCONNECTED', this.handleStatusButtonUpdate);
@@ -380,6 +382,7 @@ class Blocks extends React.Component {
         this.props.vm.removeListener('targetsUpdate', this.onTargetsUpdate);
         this.props.vm.removeListener('MONITORS_UPDATE', this.handleMonitorsUpdate);
         this.props.vm.removeListener('EXTENSION_ADDED', this.handleExtensionAdded);
+        this.props.vm.removeListener('EXTENSION_REMOVED', this.handleExtensionRemoved);
         this.props.vm.removeListener('BLOCKSINFO_UPDATE', this.handleBlocksInfoUpdate);
         this.props.vm.removeListener('PERIPHERAL_CONNECTED', this.handleStatusButtonUpdate);
         this.props.vm.removeListener('PERIPHERAL_DISCONNECTED', this.handleStatusButtonUpdate);
@@ -575,6 +578,26 @@ class Blocks extends React.Component {
     handleBlocksInfoUpdate (categoryInfo) {
         // @todo Later we should replace this to avoid all the warnings from redefining blocks.
         this.handleExtensionAdded(categoryInfo);
+    }
+    handleExtensionRemoved (categoryInfo) {
+        const removeBlocks = blockInfoArray => {
+            if (!blockInfoArray) return;
+            blockInfoArray.forEach(blockInfo => {
+                if (blockInfo.json && blockInfo.json.type) {
+                    delete this.ScratchBlocks.Blocks[blockInfo.json.type];
+                }
+            });
+        };
+
+        removeBlocks(categoryInfo.blocks);
+        removeBlocks(categoryInfo.menus);
+        removeBlocks(Object.getOwnPropertyNames(categoryInfo.customFieldTypes)
+            .map(fieldTypeName => categoryInfo.customFieldTypes[fieldTypeName].scratchBlocksDefinition));
+
+        const toolboxXML = this.getToolboxXML();
+        if (toolboxXML) {
+            this.props.updateToolboxState(toolboxXML);
+        }
     }
     handleCategorySelected (categoryId) {
         const extension = extensionData.find(ext => ext.extensionId === categoryId);

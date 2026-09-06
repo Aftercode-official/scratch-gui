@@ -15,10 +15,11 @@
 .header {
     display: flex;
     align-items: center;
-    justify-content: space-between;
+    gap: 8px;
 }
 
 .header h2 {
+    flex: 1;
     margin: 0 0 16px;
     font-size: 1.25rem;
 }
@@ -39,7 +40,8 @@
 
 .extension-item {
     display: flex;
-    flex-direction: column;
+    align-items: center;
+    justify-content: space-between;
     gap: 4px;
     padding: 12px;
     border-bottom: 1px solid $ui-black-transparent;
@@ -49,12 +51,39 @@
     border-bottom: 0;
 }
 
-.extension-item span {
+.extension-details {
+    min-width: 0;
+}
+
+.extension-details span {
     overflow: hidden;
     color: $text-primary;
     font-size: 0.8rem;
     text-overflow: ellipsis;
     white-space: nowrap;
+}
+
+.remove-button,
+.remove-all-button {
+    padding: 6px 10px;
+    color: $ui-white;
+    background-color: #c0392b;
+    border: 0;
+    cursor: pointer;
+}
+
+.remove-button:hover,
+.remove-all-button:hover {
+    background-color: #a93226;
+}
+
+.remove-button {
+    flex: 0 0 auto;
+}
+
+.remove-all-button:disabled {
+    cursor: not-allowed;
+    opacity: 0.5;
 }
 
 .empty {

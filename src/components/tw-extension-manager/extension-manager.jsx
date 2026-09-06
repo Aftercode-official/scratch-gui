@@ -17,13 +17,29 @@ const ExtensionManager = props => (
                 <button className={styles.refreshButton} onClick={props.onRefresh}>
                     {'Refresh'}
                 </button>
+                <button
+                    className={styles.removeAllButton}
+                    disabled={!props.extensions.length}
+                    onClick={props.onRemoveAll}
+                >
+                    {'Remove all'}
+                </button>
             </div>
             {props.extensions.length ? (
                 <ul className={styles.extensionList}>
                     {props.extensions.map(extension => (
                         <li className={styles.extensionItem} key={extension.id}>
-                            <strong>{extension.id}</strong>
-                            <span>{extension.url}</span>
+                            <div className={styles.extensionDetails}>
+                                <strong>{extension.id}</strong>
+                                <span>{extension.url}</span>
+                            </div>
+                            <button
+                                aria-label={`Remove ${extension.id}`}
+                                className={styles.removeButton}
+                                onClick={() => props.onRemove(extension.id)}
+                            >
+                                {'x'}
+                            </button>
                         </li>
                     ))}
                 </ul>
@@ -42,7 +58,8 @@ ExtensionManager.propTypes = {
         url: PropTypes.string.isRequired
     })).isRequired,
     onClose: PropTypes.func.isRequired,
-    onLoadCustom: PropTypes.func.isRequired,
+    onRemove: PropTypes.func.isRequired,
+    onRemoveAll: PropTypes.func.isRequired,
     onRefresh: PropTypes.func.isRequired
 };
 
