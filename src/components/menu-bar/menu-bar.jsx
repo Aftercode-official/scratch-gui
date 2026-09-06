@@ -38,7 +38,7 @@ import {
     openTipsLibrary,
     openSettingsModal,
     openRestorePointModal,
-    openPluginModal,
+    openExtensionManagerModal,
     openCustomAccentModal
 } from '../../reducers/modals';
 import {setPlayer} from '../../reducers/mode';
@@ -394,6 +394,8 @@ class MenuBar extends React.Component {
         }
         }
     }
+
+    //DANV upload project to workshop
 async handleClickUploadProject () {
     try {
         // 1. Mở tab trước để trình duyệt không chặn Popup
@@ -990,7 +992,7 @@ async handleClickUploadProject () {
                         )}
                         <div
                             className={classNames(styles.menuBarItem, styles.hoverable)}
-                            onClick={this.props.onClickCustomPlugin}
+                            onClick={this.props.onClickExtensionManager}
                         >
                             <img
                                 src={addonsIcon}
@@ -999,7 +1001,7 @@ async handleClickUploadProject () {
                                 height={20}
                             />
                             <span className={styles.collapsibleLabel}>
-                                {'Aftercode Plugin'}
+                                {'Extensions manager'}
                             </span>
                         </div>
                         {this.props.onClickSettingsModal && (
@@ -1206,7 +1208,7 @@ MenuBar.propTypes = {
     onClickAccount: PropTypes.func,
     onClickAddonSettings: PropTypes.func,
     onClickCustomAccent: PropTypes.func,
-    onClickCustomPlugin: PropTypes.func,
+    onClickCustomExtension: PropTypes.func,
     onClickDesktopSettings: PropTypes.func,
     onClickPackager: PropTypes.func,
     onClickRestorePoints: PropTypes.func,
@@ -1310,7 +1312,7 @@ const mapDispatchToProps = dispatch => ({
     onRequestOpenAbout: () => dispatch(openAboutMenu()),
     onRequestCloseAbout: () => dispatch(closeAboutMenu()),
     onClickRestorePoints: () => dispatch(openRestorePointModal()),
-    onClickCustomPlugin: () => dispatch(openPluginModal()),
+    onClickExtensionManager: () => dispatch(openExtensionManagerModal()),
     onClickCustomAccent: () => dispatch(openCustomAccentModal()),
     onClickSettings: () => dispatch(openSettingsMenu()),
     onClickSettingsModal: () => {

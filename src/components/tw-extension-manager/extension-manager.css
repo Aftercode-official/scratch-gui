@@ -1,0 +1,77 @@
+@import "../../css/colors.css";
+
+.modal-content {
+    width: 560px;
+    min-height: 280px;
+    background-color: $ui-white;
+}
+
+.body {
+    min-height: 220px;
+    padding: 24px;
+    background-color: $ui-white;
+}
+
+.header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.header h2 {
+    margin: 0 0 16px;
+    font-size: 1.25rem;
+}
+
+.refresh-button {
+    margin-bottom: 16px;
+    padding: 6px 12px;
+}
+
+.extension-list {
+    max-height: 240px;
+    margin: 0;
+    padding: 0;
+    overflow-y: auto;
+    list-style: none;
+    border: 1px solid $ui-black-transparent;
+}
+
+.extension-item {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding: 12px;
+    border-bottom: 1px solid $ui-black-transparent;
+}
+
+.extension-item:last-child {
+    border-bottom: 0;
+}
+
+.extension-item span {
+    overflow: hidden;
+    color: $text-primary;
+    font-size: 0.8rem;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.empty {
+    margin: 24px 0;
+    color: $text-primary;
+}
+
+.load-button {
+    margin-top: 16px;
+    padding: 8px 16px;
+}
+
+.load-button:disabled {
+    cursor: not-allowed;
+    opacity: 0.5;
+}
+
+.error {
+    color: #c0392b;
+}
