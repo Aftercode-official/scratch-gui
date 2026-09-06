@@ -12,7 +12,7 @@ const LoadExtensionModal = props => (
         {props.url.startsWith('data:') ? (
             <React.Fragment>
                 <FormattedMessage
-                    defaultMessage="The project wants to load a custom extension with the code:"
+                    defaultMessage="The project wants to load a custom extension:"
                     description="Part of modal asking for permission to automatically load custom extension"
                     id="tw.loadExtension.embedded"
                 />
@@ -38,7 +38,7 @@ const LoadExtensionModal = props => (
                         onChange={props.onChangeUnsandboxed}
                     />
                     <FormattedMessage
-                        defaultMessage="Run without sandbox"
+                        defaultMessage="Enable advanced permissions"
                         description="Part of modal asking for permission to automatically load custom extension"
                         id="tw.loadExtension.unsandboxed"
                     />
@@ -47,7 +47,7 @@ const LoadExtensionModal = props => (
                     <div className={styles.unsandboxedWarning}>
                         <FormattedMessage
                             // eslint-disable-next-line max-len
-                            defaultMessage="Loading extensions without the sandbox is dangerous. It will be able to corrupt your project, delete your settings, phish for passwords, and other bad things. The {APP_NAME} developers are not responsible for any resulting issues."
+                            defaultMessage="Granting full permissions allows this extension to act on behalf of Aftercode. Please make sure you trust this project source, the {APP_NAME} developers are not responsible for custom extensions."
                             description="Part of modal asking for permission to automatically load custom extension"
                             id="tw.loadExtension.unsandboxedWarning"
                             values={{

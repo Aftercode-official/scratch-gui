@@ -149,7 +149,7 @@ const CustomExtensionModal = props => (
                             />
                             <FormattedMessage
                                 // eslint-disable-next-line max-len
-                                defaultMessage="Unsandboxed extensions can corrupt your project, delete your settings, phish for passwords, and other bad things. The {APP_NAME} developers are not responsible for any resulting issues."
+                                defaultMessage="Unsandboxed extensions can take over the management of TurboWarp. The {APP_NAME} developers are not responsible for any resulting issues."
                                 description="Warning that appears when disabling extension security sandbox"
                                 id="tw.customExtensionModal.unsandboxedWarning2"
                                 values={{
