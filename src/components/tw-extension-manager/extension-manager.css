@@ -65,7 +65,7 @@
 
 .remove-button,
 .remove-all-button {
-    padding: 6px 10px;
+    padding: 6px 12px;
     color: $ui-white;
     background-color: #c0392b;
     border: 0;
