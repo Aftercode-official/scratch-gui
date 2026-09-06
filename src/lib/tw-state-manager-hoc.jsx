@@ -60,6 +60,12 @@ const getLocalStorage = key => {
 };
 
 const readHashProjectId = () => {
+
+      // FIX: Bỏ qua việc đọc ID ở đuôi # nếu đang dùng project_url
+    if (window.location.search.includes('project_url=')) {
+        return null;
+    }
+    
     const match = location.hash.match(/#(\d+)/);
     return match === null ? null : match[1];
 };
