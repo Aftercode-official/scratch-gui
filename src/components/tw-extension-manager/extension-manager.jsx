@@ -31,7 +31,21 @@ const ExtensionManager = props => (
                         <li className={styles.extensionItem} key={extension.id}>
                             <div className={styles.extensionDetails}>
                                 <strong>{extension.id}</strong>
-                                <li>{extension.url}</li>
+                                <div 
+                                    title={extension.url} 
+                                    style={{
+                                        fontSize: '12px',
+                                        color: '#777',
+                                        overflow: 'hidden',
+                                        textOverflow: 'ellipsis',
+                                        whiteSpace: 'nowrap',
+                                        maxWidth: '320px'
+                                    }}
+                                >
+                                    {extension.url.length > 60 
+                                        ? `${extension.url.slice(0, 60)}...` 
+                                        : extension.url}
+                                </div>
                             </div>
                             <button
                                 aria-label={`Remove ${extension.id}`}
