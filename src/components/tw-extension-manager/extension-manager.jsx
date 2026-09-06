@@ -31,7 +31,7 @@ const ExtensionManager = props => (
                         <li className={styles.extensionItem} key={extension.id}>
                             <div className={styles.extensionDetails}>
                                 <strong>{extension.id}</strong>
-                                <span>{extension.url}</span>
+                                <li>{extension.url}</li>
                             </div>
                             <button
                                 aria-label={`Remove ${extension.id}`}
