@@ -60,12 +60,10 @@ const getLocalStorage = key => {
 };
 
 const readHashProjectId = () => {
-
-      // FIX: Bỏ qua việc đọc ID ở đuôi # nếu đang dùng project_url
+    // FIX: Bỏ qua việc đọc ID ở đuôi # nếu đang dùng project_url
     if (window.location.search.includes('project_url=')) {
         return null;
     }
-    
     const match = location.hash.match(/#(\d+)/);
     return match === null ? null : match[1];
 };
@@ -505,6 +503,17 @@ const TWStateManager = function (WrappedComponent) {
                     return false;
                 }
             }
+            
+            // FIX LỖI
+            if (id && id !== '0') {
+                const url = new URL(window.location.href);
+                if (url.searchParams.has('project_url')) {
+                    url.searchParams.delete('project_url');
+                    // Ghi đè lại URL sạch
+                    window.history.replaceState(null, '', url.toString());
+                }
+            }
+
             this.props.onSetProjectId(id);
             return true;
         }
