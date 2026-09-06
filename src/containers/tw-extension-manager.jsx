@@ -36,6 +36,7 @@ class ExtensionManager extends React.Component {
     handleRemove (extensionId) {
         try {
             this.props.vm.extensionManager.unloadExtension(extensionId);
+            this.props.vm.refreshWorkspace();
             this.handleRefresh();
         } catch (error) {
             this.setState({error: error.message || String(error)});
@@ -45,6 +46,7 @@ class ExtensionManager extends React.Component {
     handleRemoveAll () {
         try {
             this.props.vm.extensionManager.unloadAllExtensions();
+            this.props.vm.refreshWorkspace();
             this.handleRefresh();
         } catch (error) {
             this.setState({error: error.message || String(error)});
