@@ -62,6 +62,7 @@ const base = {
         symlinks: false,
         alias: {
             'scratch-vm$': path.resolve(process.cwd(), 'aftercode-scratch-vm/src/index.js'),
+            'htmlparser2$': path.resolve(process.cwd(), 'node_modules/scratch-vm/node_modules/htmlparser2'),
             'text-encoding$': path.resolve(__dirname, 'src/lib/tw-text-encoder'),
             'scratch-render-fonts$': path.resolve(__dirname, 'src/lib/tw-scratch-render-fonts')
         }
