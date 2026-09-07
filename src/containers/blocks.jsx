@@ -11,6 +11,7 @@ import VM from 'scratch-vm';
 import log from '../lib/log.js';
 import Prompt from './prompt.jsx';
 import BlocksComponent from '../components/blocks/blocks.jsx';
+import blockStyles from '../components/blocks/blocks.css';
 import ExtensionLibrary from './extension-library.jsx';
 import extensionData from '../lib/libraries/extensions/index.jsx';
 import CustomProcedures from './custom-procedures.jsx';
@@ -47,6 +48,26 @@ import {gentlyRequestPersistentStorage} from '../lib/tw-persistent-storage.js';
 
 // TW: Strings we add to scratch-blocks are localized here
 const messages = defineMessages({
+    TOOLBOX_POSITION: {
+        defaultMessage: 'Toolbox position',
+        description: 'Label for the toolbox position selector in the blocks editor',
+        id: 'tw.blocks.toolboxPosition'
+    },
+    TOOLBOX_POSITION_START: {
+        defaultMessage: 'Start',
+        description: 'Place the toolbox at the start side of the blocks editor',
+        id: 'tw.blocks.toolboxPositionStart'
+    },
+    TOOLBOX_POSITION_TOP: {
+        defaultMessage: 'Top',
+        description: 'Place the toolbox at the top of the blocks editor',
+        id: 'tw.blocks.toolboxPositionTop'
+    },
+    TOOLBOX_POSITION_END: {
+        defaultMessage: 'End',
+        description: 'Place the toolbox at the end side of the blocks editor',
+        id: 'tw.blocks.toolboxPositionEnd'
+    },
     PROCEDURES_RETURN: {
         defaultMessage: 'return {v}',
         // eslint-disable-next-line max-len
@@ -123,14 +144,16 @@ class Blocks extends React.Component {
             'onWorkspaceMetricsChange',
             'setBlocks',
             'setLocale',
-            'handleEnableProcedureReturns'
+            'handleEnableProcedureReturns',
+            'handleToolboxPositionChange'
         ]);
         this.ScratchBlocks.prompt = this.handlePromptStart;
         this.ScratchBlocks.statusButtonCallback = this.handleConnectionModalStart;
         this.ScratchBlocks.recordSoundCallback = this.handleOpenSoundRecorder;
 
         this.state = {
-            prompt: null
+            prompt: null,
+            toolboxPosition: 'start'
         };
         this.onTargetsUpdate = debounce(this.onTargetsUpdate, 100);
         this.toolboxUpdateQueue = [];
@@ -165,6 +188,9 @@ class Blocks extends React.Component {
             },
             Blocks.defaultOptions
         );
+        workspaceConfig.horizontalLayout = this.state.toolboxPosition === 'top';
+        workspaceConfig.toolboxPosition = this.state.toolboxPosition === 'top' ? 'start' : this.state.toolboxPosition;
+        workspaceConfig.comments = true;
         this.workspace = this.ScratchBlocks.inject(this.blocks, workspaceConfig);
         AddonHooks.blocklyWorkspace = this.workspace;
 
@@ -234,6 +260,7 @@ class Blocks extends React.Component {
     shouldComponentUpdate (nextProps, nextState) {
         return (
             this.state.prompt !== nextState.prompt ||
+            this.state.toolboxPosition !== nextState.toolboxPosition ||
             this.props.isVisible !== nextProps.isVisible ||
             this._renderedToolboxXML !== nextProps.toolboxXML ||
             this.props.extensionLibraryVisible !== nextProps.extensionLibraryVisible ||
@@ -244,7 +271,12 @@ class Blocks extends React.Component {
             this.props.customStageSize !== nextProps.customStageSize
         );
     }
-    componentDidUpdate (prevProps) {
+    componentDidUpdate (prevProps, prevState) {
+        if (this.state.toolboxPosition !== prevState.toolboxPosition) {
+            this.reinitializeWorkspace();
+            return;
+        }
+
         // If any modals are open, call hideChaff to close z-indexed field editors
         if (this.props.anyModalVisible && !prevProps.anyModalVisible) {
             this.ScratchBlocks.hideChaff();
@@ -284,6 +316,18 @@ class Blocks extends React.Component {
         } else {
             this.workspace.setVisible(false);
         }
+    }
+    reinitializeWorkspace () {
+        this.detachVM();
+        this.workspace.dispose();
+        this.props.vm.clearFlyoutBlocks();
+        this.unmounted = false;
+        this.componentDidMount();
+    }
+    handleToolboxPositionChange (event) {
+        this.setState({
+            toolboxPosition: event.target.value
+        });
     }
     componentWillUnmount () {
         this.detachVM();
@@ -716,6 +760,26 @@ class Blocks extends React.Component {
         /* eslint-enable no-unused-vars */
         return (
             <React.Fragment>
+                <div className={blockStyles.toolboxPositionControl}>
+                    <label htmlFor="toolbox-position">
+                        {this.props.intl.formatMessage(messages.TOOLBOX_POSITION)}
+                    </label>
+                    <select
+                        id="toolbox-position"
+                        value={this.state.toolboxPosition}
+                        onChange={this.handleToolboxPositionChange}
+                    >
+                        <option value="start">
+                            {this.props.intl.formatMessage(messages.TOOLBOX_POSITION_START)}
+                        </option>
+                        <option value="top">
+                            {this.props.intl.formatMessage(messages.TOOLBOX_POSITION_TOP)}
+                        </option>
+                        <option value="end">
+                            {this.props.intl.formatMessage(messages.TOOLBOX_POSITION_END)}
+                        </option>
+                    </select>
+                </div>
                 <DroppableBlocks
                     componentRef={this.setBlocks}
                     onDrop={this.handleDrop}

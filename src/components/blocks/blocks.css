@@ -4,6 +4,37 @@
 
 .blocks {
     height: 100%;
+    position: relative;
+}
+
+.toolbox-position-control {
+    position: absolute;
+    top: -2.25rem;
+    right: $space;
+    z-index: 20;
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.25rem 0.4rem;
+    border: 1px solid $ui-black-transparent;
+    border-radius: 0.25rem;
+    background: $ui-primary;
+    box-shadow: 0 1px 3px $ui-black-transparent;
+    font-size: 0.7rem;
+}
+
+.toolbox-position-control label {
+    color: $text-primary;
+    white-space: nowrap;
+}
+
+.toolbox-position-control select {
+    min-width: 4.5rem;
+    border: 1px solid $ui-black-transparent;
+    border-radius: 0.2rem;
+    background: $ui-primary;
+    color: $text-primary;
+    font: inherit;
 }
 
 .drag-over:after {
@@ -42,16 +73,7 @@
 
 .blocks :global(.blocklyToolboxDiv) {
     border-right: 1px solid $ui-black-transparent;
-    border-bottom: 1px solid $ui-black-transparent;
     box-sizing: content-box;
-    height: calc(100% - 3.25rem) !important;
-
-    /*
-        For now, the layout cannot support scrollbars in the category menu.
-        The line below works for Edge, the `::-webkit-scrollbar` line
-        below that is for webkit browsers. It isn't possible to do the
-        same for Firefox, so a different solution may be needed for them.
-    */
     -ms-overflow-style: none;
 }
 
@@ -64,6 +86,7 @@
     display: none;
 }
 
+/* 2. Hiển thị Flyout chứa các khối lệnh khi nằm ngang */
 .blocks :global(.blocklyFlyout) {
     border-right: 1px solid $ui-black-transparent;
     box-sizing: content-box;
@@ -74,21 +97,11 @@
     border-left: 1px solid $ui-black-transparent;
 }
 
-
 .blocks :global(.blocklyBlockDragSurface) {
-    /*
-        Fix an issue where the drag surface was preventing hover events for sharing blocks.
-        This does not prevent user interaction on the blocks themselves.
-    */
     pointer-events: none;
-    z-index: $z-index-drag-layer; /* make blocks match gui drag layer */
+    z-index: $z-index-drag-layer;
 }
 
-/*
-    Shrink category font to fit "My Blocks" for now.
-    Probably will need different solutions for language support later, so
-    make the change here instead of in scratch-blocks.
-*/
 .blocks :global(.scratchCategoryMenuItemLabel) {
     font-size: 0.65rem;
 }
