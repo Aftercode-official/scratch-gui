@@ -254,7 +254,6 @@ class Blocks extends React.Component {
         for (const category of this.props.vm.runtime._blockInfo) {
             this.handleExtensionAdded(category);
         }
-
         gentlyRequestPersistentStorage();
     }
     shouldComponentUpdate (nextProps, nextState) {
@@ -380,7 +379,6 @@ class Blocks extends React.Component {
         } else {
             this.workspace.toolbox_.setFlyoutScrollPos(currentCategoryPos);
         }
-
         const queue = this.toolboxUpdateQueue;
         this.toolboxUpdateQueue = [];
         queue.forEach(fn => fn());
@@ -651,6 +649,9 @@ class Blocks extends React.Component {
 
         this.withToolboxUpdates(() => {
             this.workspace.toolbox_.setSelectedCategoryById(categoryId);
+            if (this.state.toolboxPosition === 'top') {
+                requestAnimationFrame(() => this.stackTopFlyoutBlocks());
+            }
         });
     }
     setBlocks (blocks) {

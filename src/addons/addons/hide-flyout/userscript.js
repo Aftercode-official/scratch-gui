@@ -14,6 +14,12 @@ export default async function ({ addon, console, msg }) {
 
   const Blockly = await addon.tab.traps.getBlockly();
 
+  function isStartToolbox() {
+    const workspace = Blockly.getMainWorkspace();
+    return workspace && !workspace.horizontalLayout &&
+      workspace.toolboxPosition === Blockly.TOOLBOX_AT_LEFT;
+  }
+
   function getSpeedValue() {
     let data = {
       none: "0",
@@ -47,6 +53,7 @@ export default async function ({ addon, console, msg }) {
   }
 
   function autoLock() {
+    if (!isStartToolbox()) return;
     const option = addon.settings.get("lockLoad");
     if (option) {
       if (getToggleSetting() === "category") {
@@ -61,6 +68,7 @@ export default async function ({ addon, console, msg }) {
   }
 
   function onmouseenter(e, speed = {}) {
+    if (!isStartToolbox()) return;
     // If a mouse event was passed, only open flyout if the workspace isn't being dragged
     if (
       !e ||
@@ -80,6 +88,7 @@ export default async function ({ addon, console, msg }) {
   }
 
   function onmouseleave(e, speed = getSpeedValue()) {
+    if (!isStartToolbox()) return;
     if (flyoutLock) return;
     if (e && e.buttons) {
       // dragging a block or scrollbar
@@ -110,6 +119,7 @@ export default async function ({ addon, console, msg }) {
 
     addon.tab.redux.initialize();
     addon.tab.redux.addEventListener("statechanged", (e) => {
+      if (!isStartToolbox()) return;
       switch (e.detail.action.type) {
         // Event casted when you switch between tabs
         case "scratch-gui/navigation/ACTIVATE_TAB": {
@@ -153,7 +163,7 @@ export default async function ({ addon, console, msg }) {
     });
 
     addon.settings.addEventListener("change", () => {
-      if (addon.self.disabled) return;
+      if (addon.self.disabled || !isStartToolbox()) return;
       if (getToggleSetting() === "category") {
         // switching to category click mode
         // close the flyout unless it's locked
@@ -183,7 +193,7 @@ export default async function ({ addon, console, msg }) {
     Blockly.Toolbox.prototype.setSelectedItem = function (item, shouldScroll = true) {
       const previousSelection = this.selectedItem_;
       oldSetSelectedItem.call(this, item, shouldScroll);
-      if (addon.self.disabled || getToggleSetting() !== "category") return;
+      if (addon.self.disabled || !isStartToolbox() || getToggleSetting() !== "category") return;
       if (!shouldScroll && !toggle) {
         // ignore initial selection when updating the toolbox
         item.setSelected(false);
@@ -205,7 +215,7 @@ export default async function ({ addon, console, msg }) {
     Blockly.Toolbox.prototype.selectCategoryById = function (...args) {
       // called after populating the toolbox
       // ignore if the palette is closed
-      if (!addon.self.disabled && getToggleSetting() === "category" && !toggle) return;
+      if (isStartToolbox() && !addon.self.disabled && getToggleSetting() === "category" && !toggle) return;
       return oldSelectCategoryById.call(this, ...args);
     };
 
