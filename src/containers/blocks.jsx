@@ -761,23 +761,6 @@ class Blocks extends React.Component {
         /* eslint-enable no-unused-vars */
         return (
             <React.Fragment>
-                <div className={blockStyles.toolboxPositionControl}>
-                    <label htmlFor="toolbox-position">
-                        {this.props.intl.formatMessage(messages.TOOLBOX_POSITION)}
-                    </label>
-                    <select
-                        id="toolbox-position"
-                        value={this.state.toolboxPosition}
-                        onChange={this.handleToolboxPositionChange}
-                    >
-                        <option value="start">
-                            {this.props.intl.formatMessage(messages.TOOLBOX_POSITION_START)}
-                        </option>
-                        <option value="end">
-                            {this.props.intl.formatMessage(messages.TOOLBOX_POSITION_END)}
-                        </option>
-                    </select>
-                </div>
                 <DroppableBlocks
                     componentRef={this.setBlocks}
                     onDrop={this.handleDrop}
