@@ -773,9 +773,6 @@ class Blocks extends React.Component {
                         <option value="start">
                             {this.props.intl.formatMessage(messages.TOOLBOX_POSITION_START)}
                         </option>
-                        <option value="top">
-                            {this.props.intl.formatMessage(messages.TOOLBOX_POSITION_TOP)}
-                        </option>
                         <option value="end">
                             {this.props.intl.formatMessage(messages.TOOLBOX_POSITION_END)}
                         </option>
