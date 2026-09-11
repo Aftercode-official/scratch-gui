@@ -83,7 +83,7 @@ const Credits = () => (
         </section>
         <section>
             <h2>Vercel</h2>
-            <p>We currently use <a href="https://vercel.com/">Vercel</a> to host ElectraMod.</p>
+            <p>We currently use <a href="https://vercel.com/">Vercel</a> to host Aftercode.</p>
             <a href="https://vercel.com/">
                 <img
                     src="https://raw.githubusercontent.com/github/explore/3c66f1237835e0b877190fbea528d0ebece7bccf/topics/vercel/vercel.png"
@@ -91,16 +91,6 @@ const Credits = () => (
                     height="160"
                 />
             </a>
-            {/* <h2>Domain Provider</h2>
-            <p>
-                <a href="https://penguinmod.com">penguinmod.com</a> (and any subdomains) are currently
-                provided by <a href="https://github.com/enderhacker">NotHouse</a>.
-                <br></br>
-                <a href="https://github.com/enderhacker">
-                    <img src="https://avatars.githubusercontent.com/u/61245488?v=4" style={{ width: "128px" }}></img>
-                </a>
-            </p>
-            */}
         </section>
         <section>
             <h2>Special Thanks</h2>
