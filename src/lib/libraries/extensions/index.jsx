@@ -53,6 +53,7 @@ import twIcon from './tw/tw.svg';
 import customExtensionIcon from './custom/custom.svg';
 import returnIcon from './custom/return.svg';
 import galleryIcon from './gallery/gallery.svg';
+import twgalleryIcon from './gallery/tw-gallery.svg';
 import {APP_NAME} from '../../brand';
 
 export default [
@@ -426,83 +427,46 @@ export default [
         tags: ['ac','tw'],
         featured: true
         // Not marked as incompatible with Scratch so that clicking on it doesn't show a prompt
-    }
+    },
 ];
 
-export const galleryLoading = {
-    name: (
-        <FormattedMessage
-            defaultMessage="{APP_NAME} Extension Gallery"
-            description="Name of extensions.turbowarp.org in extension library"
-            id="tw.extensionGallery.name"
-            values={{
-                APP_NAME
-            }}
-        />
-    ),
-    href: 'https://aftercode-extensions.vercel.app/',
-    extensionId: 'gallery',
-    iconURL: galleryIcon,
-    description: (
-        <FormattedMessage
-            // eslint-disable-next-line max-len
-            defaultMessage="Loading extension gallery..."
-            description="Appears while loading extension list from the custom extension gallery"
-            id="tw.extensionGallery.loading"
-        />
-    ),
-    tags: ['ac','tw'],
-    featured: true
+const gallerySourceDisplay = {
+    aftercode: {
+        name: 'Aftercode Extension Gallery',
+        href: 'https://aftercode-extensions.vercel.app/',
+        iconURL: galleryIcon,
+        tag: 'ac'
+    },
+    turbowarp: {
+        name: 'TurboWarp Extension Gallery',
+        href: 'https://extensions.turbowarp.org/',
+        iconURL: twgalleryIcon,
+        tag: 'tw'
+    }
 };
 
-export const galleryMore = {
-    name: (
-        <FormattedMessage
-            defaultMessage="{APP_NAME} Extension Gallery"
-            description="Name of extensions.turbowarp.org in extension library"
-            id="tw.extensionGallery.name"
-            values={{
-                APP_NAME
-            }}
-        />
-    ),
-    href: 'https://aftercode-extensions.vercel.app/',
-    extensionId: 'gallery',
-    iconURL: galleryIcon,
-    description: (
-        <FormattedMessage
-            // eslint-disable-next-line max-len
-            defaultMessage="Learn more about extensions at extensions.turbowarp.org."
-            description="Appears after the extension list from the gallery was loaded successfully"
-            id="tw.extensionGallery.more"
-        />
-    ),
-    tags: ['ac','tw'],
-    featured: true
+const createGalleryStatusItem = (sourceId, description) => {
+    const source = gallerySourceDisplay[sourceId];
+    return {
+        name: source.name,
+        href: source.href,
+        extensionId: `gallery_${sourceId}`,
+        iconURL: source.iconURL,
+        description,
+        tags: [source.tag],
+        featured: true
+    };
 };
 
-export const galleryError = {
-    name: (
-        <FormattedMessage
-            defaultMessage="{APP_NAME} Extension Gallery"
-            description="Name of extensions.turbowarp.org in extension library"
-            id="tw.extensionGallery.name"
-            values={{
-                APP_NAME
-            }}
-        />
-    ),
-    href: 'https://aftercode-extensions.vercel.app/',
-    extensionId: 'gallery',
-    iconURL: galleryIcon,
-    description: (
-        <FormattedMessage
-            // eslint-disable-next-line max-len
-            defaultMessage="Error loading extension gallery. Visit extensions.turbowarp.org to find more extensions."
-            description="Appears when an error occurred loading extension list from the custom extension gallery"
-            id="tw.extensionGallery.error"
-        />
-    ),
-    tags: ['ac','tw'],
-    featured: true
+export const galleryStatusItems = {
+    aftercode: {
+        loading: createGalleryStatusItem('aftercode', 'Loading Aftercode extension gallery...'),
+        more: createGalleryStatusItem('aftercode', 'Learn more about extensions at extensions.aftercode.org.'),
+        error: createGalleryStatusItem('aftercode', 'Error loading Aftercode extension gallery. Visit extensions.aftercode.org to find more extensions.')
+    },
+    turbowarp: {
+        loading: createGalleryStatusItem('turbowarp', 'Loading TurboWarp extension gallery...'),
+        more: createGalleryStatusItem('turbowarp', 'Learn more about extensions at extensions.turbowarp.org.'),
+        error: createGalleryStatusItem('turbowarp', 'Error loading TurboWarp extension gallery. Visit extensions.turbowarp.org to find more extensions.')
+    }
 };

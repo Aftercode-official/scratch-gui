@@ -1,205 +1,532 @@
 import bindAll from 'lodash.bindall';
+
 import PropTypes from 'prop-types';
+
 import React from 'react';
+
 import VM from 'scratch-vm';
+
 import {defineMessages, injectIntl, intlShape} from 'react-intl';
+
 import log from '../lib/log';
 
+import {manuallyTrustExtension} from './tw-security-manager.jsx';
+
+
+
 import extensionLibraryContent, {
-    galleryError,
-    galleryLoading,
-    galleryMore
+
+    galleryStatusItems
+
 } from '../lib/libraries/extensions/index.jsx';
+
 import extensionTags from '../lib/libraries/tw-extension-tags';
 
+
+
 import LibraryComponent from '../components/library/library.jsx';
+
 import extensionIcon from '../components/action-menu/icon--sprite.svg';
 
-const messages = defineMessages({
-    extensionTitle: {
-        defaultMessage: 'Choose an Extension',
-        description: 'Heading for the extension library',
-        id: 'gui.extensionLibrary.chooseAnExtension'
+import defaultExtensionBanner from '../lib/libraries/extensions/custom/custom.svg';
+
+
+
+const gallerySources = [
+
+     {
+
+        id: 'turbowarp',
+
+        baseURL: 'https://extensions.turbowarp.org/',
+
+        metadataURL: 'https://extensions.turbowarp.org/generated-metadata/extensions-v0.json',
+
+        tag: 'tw'
+
+    },
+    {
+
+        id: 'aftercode', // Chuyển thành viết thường để khớp với galleryStatusItems
+
+        baseURL: 'https://aftercode-extensions.vercel.app/',
+
+        metadataURL: 'https://aftercode-extensions.vercel.app/generated-metadata/extensions-v0.json',
+
+        tag: 'ac'
+
     }
+
+];
+
+
+
+const messages = defineMessages({
+
+    extensionTitle: {
+
+        defaultMessage: 'Choose an Extension',
+
+        description: 'Heading for the extension library',
+
+        id: 'gui.extensionLibrary.chooseAnExtension'
+
+    }
+
 });
+
+
 
 const toLibraryItem = extension => {
+
     if (typeof extension === 'object') {
+
         return ({
+
             rawURL: extension.iconURL || extensionIcon,
+
             ...extension
+
         });
+
     }
+
     return extension;
+
 };
+
+
 
 const translateGalleryItem = (extension, locale) => ({
+
     ...extension,
+
     name: extension.nameTranslations[locale] || extension.name,
+
     description: extension.descriptionTranslations[locale] || extension.description
+
 });
 
-let cachedGallery = null;
+
+
+const mapGalleryExtension = (extension, source) => ({
+
+    name: extension.name,
+
+    nameTranslations: extension.nameTranslations || {},
+
+    description: extension.description,
+
+    descriptionTranslations: extension.descriptionTranslations || {},
+
+    extensionId: extension.id,
+
+    extensionURL: `${source.baseURL}${extension.slug}.js`,
+
+    iconURL: extension.image ? `${source.baseURL}${extension.image}` : defaultExtensionBanner,
+
+    tags: [source.tag],
+
+    credits: [
+
+        ...(extension.original || []),
+
+        ...(extension.by || [])
+
+    ].map(credit => {
+
+        if (credit.link) {
+
+            return (
+
+                <a
+
+                    href={credit.link}
+
+                    target="_blank"
+
+                    rel="noreferrer"
+
+                    key={credit.name}
+
+                >
+
+                    {credit.name}
+
+                </a>
+
+            );
+
+        }
+
+        return credit.name;
+
+    }),
+
+    docsURI: extension.docs ? `${source.baseURL}${extension.slug}` : null,
+
+    samples: extension.samples ? extension.samples.map(sample => ({
+
+        href: `${process.env.ROOT}editor?project_url=${source.baseURL}samples/${encodeURIComponent(sample)}.sb3`,
+
+        text: sample
+
+    })) : null,
+
+    incompatibleWithScratch: !extension.scratchCompatible,
+
+    featured: true
+
+});
+
+
+
+let cachedGalleryBySource = null;
+
+
 
 const fetchLibrary = async () => {
-    const res = await fetch('https://aftercode-extensions.vercel.app/generated-metadata/extensions-v0.json');
-    if (!res.ok) {
-        throw new Error(`HTTP status ${res.status}`);
-    }
-    const data = await res.json();
-    return data.extensions.map(extension => ({
-        name: extension.name,
-        nameTranslations: extension.nameTranslations || {},
-        description: extension.description,
-        descriptionTranslations: extension.descriptionTranslations || {},
-        extensionId: extension.id,
-        extensionURL: `https://aftercode-extensions.vercel.app/${extension.slug}.js`,
-        iconURL: `https://aftercode-extensions.vercel.app/${extension.image || 'images/unknown.svg'}`,
-        tags: ['ac'],
-        credits: [
-            ...(extension.original || []),
-            ...(extension.by || [])
-        ].map(credit => {
-            if (credit.link) {
-                return (
-                    <a
-                        href={credit.link}
-                        target="_blank"
-                        rel="noreferrer"
-                        key={credit.name}
-                    >
-                        {credit.name}
-                    </a>
-                );
-            }
-            return credit.name;
-        }),
-        docsURI: extension.docs ? `https://aftercode-extensions.vercel.app/${extension.slug}` : null,
-        samples: extension.samples ? extension.samples.map(sample => ({
-            href: `${process.env.ROOT}editor?project_url=https://aftercode-extensions.vercel.app/samples/${encodeURIComponent(sample)}.sb3`,
-            text: sample
-        })) : null,
-        incompatibleWithScratch: !extension.scratchCompatible,
-        featured: true
+
+    const results = await Promise.allSettled(gallerySources.map(async source => {
+
+        const res = await fetch(source.metadataURL);
+
+        if (!res.ok) {
+
+            throw new Error(`[${source.id}] HTTP status ${res.status}`);
+
+        }
+
+        const data = await res.json();
+
+        return data.extensions.map(extension => mapGalleryExtension(extension, source));
+
     }));
+
+
+
+    const extensionIds = new Set();
+
+    const galleryBySource = {};
+
+
+
+    for (const [index, result] of results.entries()) {
+
+        const source = gallerySources[index];
+
+
+
+        if (result.status === 'fulfilled') {
+
+            const extensions = [];
+
+            for (const extension of result.value) {
+
+                if (!extensionIds.has(extension.extensionId)) {
+
+                    extensionIds.add(extension.extensionId);
+
+                    extensions.push(extension);
+
+                }
+
+            }
+
+            galleryBySource[source.id] = {
+
+                status: 'success',
+
+                extensions
+
+            };
+
+        } else {
+
+            log.error(result.reason);
+
+            galleryBySource[source.id] = {
+
+                status: 'error',
+
+                error: result.reason,
+
+                extensions: []
+
+            };
+
+        }
+
+    }
+
+
+
+    return galleryBySource;
+
 };
 
+
+
 class ExtensionLibrary extends React.PureComponent {
+
     constructor (props) {
+
         super(props);
+
         bindAll(this, [
+
             'handleItemSelect'
+
         ]);
+
         this.state = {
-            gallery: cachedGallery,
-            galleryError: null,
+
+            galleryBySource: cachedGalleryBySource,
+
             galleryTimedOut: false
+
         };
+
     }
+
+
+
     componentDidMount () {
-        if (!this.state.gallery) {
+
+        if (!this.state.galleryBySource) {
+
             const timeout = setTimeout(() => {
+
                 this.setState({
+
                     galleryTimedOut: true
+
                 });
+
             }, 750);
 
+
+
             fetchLibrary()
-                .then(gallery => {
-                    cachedGallery = gallery;
+
+                .then(galleryBySource => {
+
+                    cachedGalleryBySource = galleryBySource;
+
                     this.setState({
-                        gallery
+
+                        galleryBySource
+
                     });
+
                     clearTimeout(timeout);
+
                 })
+
                 .catch(error => {
+
                     log.error(error);
-                    this.setState({
-                        galleryError: error
-                    });
+
                     clearTimeout(timeout);
+
                 });
+
         }
+
     }
+
+
+
     handleItemSelect (item) {
-        if (item.href) {
+
+        if (!item || item.href) {
+
             return;
+
         }
+
+
 
         const extensionId = item.extensionId;
 
+
+
         if (extensionId === 'custom_extension') {
+
             this.props.onOpenCustomExtensionModal();
+
             return;
+
         }
 
-        if (extensionId === 'procedures_enable_return') {
-            this.props.onEnableProcedureReturns();
-            this.props.onCategorySelected('myBlocks');
-            return;
-        }
+
 
         const url = item.extensionURL ? item.extensionURL : extensionId;
+
         if (!item.disabled) {
+
+            if (item.extensionURL) manuallyTrustExtension(url);
+
             if (this.props.vm.extensionManager.isExtensionLoaded(extensionId)) {
+
                 this.props.onCategorySelected(extensionId);
+
             } else {
+
                 this.props.vm.extensionManager.loadExtensionURL(url)
+
                     .then(() => {
+
                         this.props.onCategorySelected(extensionId);
+
                     })
+
                     .catch(err => {
+
                         log.error(err);
+
                         // eslint-disable-next-line no-alert
+
                         alert(err);
+
                     });
+
             }
+
         }
+
     }
+
+
+
     render () {
+
         let library = null;
-        if (this.state.gallery || this.state.galleryError || this.state.galleryTimedOut) {
+
+
+
+        if (this.state.galleryBySource || this.state.galleryTimedOut) {
+
+            const locale = this.props.intl.locale;
+
+
+
             library = extensionLibraryContent.map(toLibraryItem);
+
             library.push('---');
-            if (this.state.gallery) {
-                library.push(toLibraryItem(galleryMore));
-                const locale = this.props.intl.locale;
-                library.push(
-                    ...this.state.gallery
+
+
+
+            for (const source of gallerySources) {
+
+                const sourceGallery = this.state.galleryBySource ? this.state.galleryBySource[source.id] : null;
+
+                // Lấy status item an toàn (tránh lỗi undefined)
+
+                const sourceStatusItems = galleryStatusItems && galleryStatusItems[source.id];
+
+                if (sourceGallery && sourceGallery.status === 'success') {
+
+                    if (sourceStatusItems && sourceStatusItems.more) {
+
+                        library.push(toLibraryItem(sourceStatusItems.more));
+
+                    }
+
+                    library.push(
+
+                    ...sourceGallery.extensions
+
                         .filter(i => i.extensionId !== 'faceSensing')
+
                         .map(i => translateGalleryItem(i, locale))
+
                         .map(toLibraryItem)
+
                 );
-            } else if (this.state.galleryError) {
-                library.push(toLibraryItem(galleryError));
-            } else {
-                library.push(toLibraryItem(galleryLoading));
+
+                } else if (sourceGallery && sourceGallery.status === 'error') {
+
+                    if (sourceStatusItems && sourceStatusItems.error) {
+
+                        library.push(toLibraryItem(sourceStatusItems.error));
+
+                    }
+
+                } else if (sourceStatusItems && sourceStatusItems.loading) {
+
+                    library.push(toLibraryItem(sourceStatusItems.loading));
+
+                }
+
+
+
+                library.push('---');
+
             }
+
+
+
+            if (library[library.length - 1] === '---') {
+
+                library.pop();
+
+            }
+
         }
+
+
+
         return (
+
             <LibraryComponent
+
                 data={library}
+
                 filterable
+
                 persistableKey="extensionId"
+
                 id="extensionLibrary"
+
                 tags={extensionTags}
+
                 title={this.props.intl.formatMessage(messages.extensionTitle)}
+
                 visible={this.props.visible}
+
                 onItemSelected={this.handleItemSelect}
+
                 onRequestClose={this.props.onRequestClose}
+
             />
+
         );
+
     }
+
 }
 
+
+
 ExtensionLibrary.propTypes = {
+
     intl: intlShape.isRequired,
+
     onCategorySelected: PropTypes.func,
+
     onEnableProcedureReturns: PropTypes.func,
+
     onOpenCustomExtensionModal: PropTypes.func,
+
     onRequestClose: PropTypes.func,
+
     visible: PropTypes.bool,
-    vm: PropTypes.instanceOf(VM).isRequired // eslint-disable-line react/no-unused-prop-types
+
+    vm: PropTypes.instanceOf(VM).isRequired
+
 };
+
+
 
 export default injectIntl(ExtensionLibrary);
