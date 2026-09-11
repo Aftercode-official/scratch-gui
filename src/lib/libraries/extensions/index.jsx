@@ -461,7 +461,7 @@ const createGalleryStatusItem = (sourceId, description) => {
 export const galleryStatusItems = {
     aftercode: {
         loading: createGalleryStatusItem('aftercode', 'Loading Aftercode extension gallery...'),
-        more: createGalleryStatusItem('aftercode', 'Learn more about extensions at extensions.aftercode.org.'),
+        more: createGalleryStatusItem('aftercode', 'Learn more about extensions at aftercode-extensions.vercel.app.'),
         error: createGalleryStatusItem('aftercode', 'Error loading Aftercode extension gallery. Visit extensions.aftercode.org to find more extensions.')
     },
     turbowarp: {
