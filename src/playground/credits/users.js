@@ -27,6 +27,17 @@ const developers = [
     },
 ].map(fromHardcoded);
 
+const specialThanks = [
+    {
+        userID: '165599831',
+        username: 'VN-Scratch-Protector'
+    },
+    {
+        userID: '160325509',
+        username: '_kitty-the-cat_'
+    },
+].map(fromHardcoded);
+
 const contributors = [
     {
         userID: '41219524',
@@ -389,6 +400,7 @@ const docs = [
 
 export default {
     developers: shuffle(developers),
+    specialThanks: shuffle(specialThanks),
     contributors: shuffle(contributors),
     addonDevelopers: shuffle(addonDevelopers),
     extensionDevelopers: shuffle(extensionDevelopers),

@@ -68,6 +68,24 @@ const Credits = () => (
             <h2>Developer</h2>
             <UserList users={UserData.developers} />
         </section>
+        <section>
+            <h2>Thank you</h2>
+            <p>
+                Thank you to everyone who have contributed to the development of Scratch, TurboWarp, and Gandi IDE, as well as the Scratch Team for creating Scratch and releasing it as open source.
+            </p>
+            <a href="https://scratch.mit.edu/donate">
+                Donate to support Scratch.
+            </a>
+            <br></br><br></br>
+            <a href="https://github.com/sponsors/GarboMuffin">
+                Donate to support TurboWarp.
+            </a>
+        </section>
+        <section>
+            <h2>Special Thanks</h2>
+            <UserList users={UserData.specialThanks} />
+            <p>for helping fix bugs and deploy the web version</p>
+        </section>
         {APP_NAME !== 'TurboWarp' && (
             // Be kind and considerate. Don't remove this :)
             <section>
