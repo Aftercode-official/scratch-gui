@@ -1002,7 +1002,7 @@ async handleClickUploadProject () {
                                 height={29}
                             />
                             <span className={styles.collapsibleLabel}>
-                                {'Extensions manager'}
+                                {'Manage extension'}
                             </span>
                         </div>
                         {this.props.onClickSettingsModal && (
