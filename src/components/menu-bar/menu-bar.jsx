@@ -102,6 +102,7 @@ import editIcon from './icon--edit.svg';
 import addonsIcon from './addons.svg';
 import errorIcon from './tw-error.svg';
 import advancedIcon from './tw-advanced.svg';
+import extensionmanagerIcon from './tw-extension-manager.svg';
 
 import ninetiesLogo from './nineties_logo.svg';
 import catLogo from './cat_logo.svg';
@@ -995,10 +996,10 @@ async handleClickUploadProject () {
                             onClick={this.props.onClickExtensionManager}
                         >
                             <img
-                                src={addonsIcon}
+                                src={extensionmanagerIcon}
                                 draggable={false}
-                                width={20}
-                                height={20}
+                                width={29}
+                                height={29}
                             />
                             <span className={styles.collapsibleLabel}>
                                 {'Extensions manager'}
