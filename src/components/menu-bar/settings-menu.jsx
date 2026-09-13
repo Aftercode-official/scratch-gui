@@ -71,7 +71,7 @@ const SettingsMenu = ({
                 )}
                 {onOpenExtensionManager && (
                     <MenuItem onClick={onOpenExtensionManager}>
-                        {'Extension Manager'}
+                        {'Manage Extensions'}
                     </MenuItem>
                 )}
                 {onOpenCustomAccent && (
