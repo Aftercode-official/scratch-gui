@@ -100,6 +100,7 @@ import aboutIcon from './icon--about.svg';
 import fileIcon from './icon--file.svg';
 import editIcon from './icon--edit.svg';
 import addonsIcon from './addons.svg';
+import DANVwsIcon from './upload-danv.png';
 import errorIcon from './tw-error.svg';
 import advancedIcon from './tw-advanced.svg';
 
@@ -1091,7 +1092,7 @@ async handleClickUploadProject () {
                                 onClick={this.handleClickUploadProject}
                             >
                                 <img
-                                    src="https://i.ibb.co/9mhxsQM2/ezgif-1b203d38782d98f9.png"
+                                    src={DANVwsIcon}
                                     draggable={false}
                                     className={styles.uploadProjectIcon}
                                 />
