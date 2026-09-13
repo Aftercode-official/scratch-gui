@@ -338,31 +338,24 @@ class ExtensionLibrary extends React.PureComponent {
 
 
     handleItemSelect (item) {
+    if (!item || item.href) {
+        return;
+    }
 
-        if (!item || item.href) {
+    const extensionId = item.extensionId;
 
-            return;
+    if (extensionId === 'custom_extension') {
+        this.props.onOpenCustomExtensionModal();
+        return;
+    }
 
-        }
+    if (extensionId === 'procedures_enable_return') {
+        this.props.onEnableProcedureReturns();
+        this.props.onRequestClose();
+        return;
+    }
 
-
-
-        const extensionId = item.extensionId;
-
-
-
-        if (extensionId === 'custom_extension') {
-
-            this.props.onOpenCustomExtensionModal();
-
-            return;
-
-        }
-
-
-
-        const url = item.extensionURL ? item.extensionURL : extensionId;
-
+    const url = item.extensionURL ? item.extensionURL : extensionId;
         if (!item.disabled) {
 
             if (item.extensionURL) manuallyTrustExtension(url);
