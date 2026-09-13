@@ -1,32 +1,75 @@
 @import "../../css/colors.css";
 
 .modal-content {
-    width: 420px;
-    min-height: 220px;
-    background-color: $ui-white;
+    width: 440px;
+    max-width: 90vw;
+    background-color: #292929; /* Màu xám đặc trưng của modal Scratch Dark Mode */
+    border: 1px solid #3c3c3c;
+    border-radius: 8px; /* Kiểu bo góc vừa phải, mang nét classic */
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
 }
 
 .body {
-    min-height: 160px;
     padding: 24px;
-    background-color: $ui-white;
+    background-color: #292929;
+    color: #d9d9d9;
+    font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
 }
 
 .body h2 {
-    margin: 0 0 16px;
-    font-size: 1.25rem;
+    margin: 0;
+    font-size: 1.2rem;
+    font-weight: 600;
+    color: #ffffff;
+}
+
+/* Phần chọn màu hoặc các dòng tùy chỉnh */
+.body > div:not(.button-row) {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+/* Khu vực chứa nút bấm đặt ở góc phải hoặc nằm ngang theo chuẩn form classic */
+.button-row, .load-button {
+    /* Đảm bảo các nút nằm gọn gàng, không bị tràn */
 }
 
 .load-button {
-    margin-top: 16px;
-    padding: 8px 16px;
+    padding: 8px 20px;
+    background-color: #4c97ff;
+    color: white;
+    border: 1px solid rgba(0, 0, 0, 0.1);
+    border-radius: 16px; /* Bo tròn nhẹ nhàng */
+    font-weight: 500;
+    font-size: 0.9rem;
+    cursor: pointer;
+    transition: background-color 0.15s ease;
+}
+
+.load-button:hover:not(:disabled) {
+    background-color: #3385ff;
+}
+
+.load-button:active:not(:disabled) {
+    background-color: #1a75ff;
 }
 
 .load-button:disabled {
     cursor: not-allowed;
-    opacity: 0.5;
+    opacity: 0.4;
+    background-color: #555555;
+    color: #aaaaaa;
 }
 
 .error {
-    color: #c0392b;
+    color: #ff6b6b;
+    font-size: 0.85rem;
+    margin-top: -10px;
 }

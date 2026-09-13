@@ -44,7 +44,6 @@ class CustomAccentModal extends React.Component {
                     >
                         {'Apply'}
                     </button>
-                    <button onClick={this.props.onClose}>{'Cancel'}</button>
                 </div>
             </Modal>
         );
