@@ -338,7 +338,7 @@ class ExtensionLibrary extends React.PureComponent {
 
 
     handleItemSelect (item) {
-    if (!item || item.href) {
+    if (item.href) {
         return;
     }
 
@@ -351,7 +351,7 @@ class ExtensionLibrary extends React.PureComponent {
 
     if (extensionId === 'procedures_enable_return') {
         this.props.onEnableProcedureReturns();
-        this.props.onRequestClose();
+        this.props.onCategorySelected('myBlocks');
         return;
     }
 
