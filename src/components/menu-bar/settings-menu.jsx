@@ -69,11 +69,6 @@ const SettingsMenu = ({
                         <TWAccentThemeMenu />
                     </React.Fragment>
                 )}
-                {onOpenExtensionManager && (
-                    <MenuItem onClick={onOpenExtensionManager}>
-                        {'Manage Extensions'}
-                    </MenuItem>
-                )}
                 {onOpenCustomAccent && (
                     <MenuItem onClick={onOpenCustomAccent}>
                         {'Custom accent'}

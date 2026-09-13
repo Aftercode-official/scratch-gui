@@ -102,7 +102,6 @@ import editIcon from './icon--edit.svg';
 import addonsIcon from './addons.svg';
 import errorIcon from './tw-error.svg';
 import advancedIcon from './tw-advanced.svg';
-import extensionmanagerIcon from './tw-extension-manager.svg';
 
 import ninetiesLogo from './nineties_logo.svg';
 import catLogo from './cat_logo.svg';
@@ -844,6 +843,7 @@ async handleClickUploadProject () {
                                     )}</DeletionRestorer>
                                 )}
                                 <MenuSection>
+                                    {/*menu bar*/}
                                     <TurboMode>{(toggleTurboMode, {turboMode}) => (
                                         <MenuItem onClick={toggleTurboMode}>
                                             {turboMode ? (
@@ -918,6 +918,13 @@ async handleClickUploadProject () {
                                     )}</CloudVariablesToggler>
                                 </MenuSection>
                                 <MenuSection>
+                                    <MenuItem onClick={this.props.onClickExtensionManager}>
+                                        <FormattedMessage
+                                            defaultMessage="Manage Extensions"
+                                            description="Menu bar item for Manage Extensions"
+                                            id="tw.menuBar.ManageExtension"
+                                        />
+                                    </MenuItem>
                                     <MenuItem onClick={this.props.onClickSettingsModal}>
                                         <FormattedMessage
                                             defaultMessage="Advanced Settings"
