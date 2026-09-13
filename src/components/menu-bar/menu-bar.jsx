@@ -643,6 +643,7 @@ async handleClickUploadProject () {
                                 this.props.onClickAddonSettings.bind(null, 'editor-theme3')
                             }
                             onOpenCustomAccent={this.props.onClickCustomAccent}
+                            onOpenExtensionManager={this.props.onClickExtensionManager}
                             onRequestClose={this.props.onRequestCloseSettings}
                             onRequestOpen={this.props.onClickSettings}
                             settingsMenuOpen={this.props.settingsMenuOpen}
@@ -991,20 +992,6 @@ async handleClickUploadProject () {
                                 </span>
                             </div>
                         )}
-                        <div
-                            className={classNames(styles.menuBarItem, styles.hoverable)}
-                            onClick={this.props.onClickExtensionManager}
-                        >
-                            <img
-                                src={extensionmanagerIcon}
-                                draggable={false}
-                                width={29}
-                                height={29}
-                            />
-                            <span className={styles.collapsibleLabel}>
-                                {'Extensions'}
-                            </span>
-                        </div>
                         {this.props.onClickSettingsModal && (
                             <div
                                 className={classNames(styles.menuBarItem, styles.hoverable)}

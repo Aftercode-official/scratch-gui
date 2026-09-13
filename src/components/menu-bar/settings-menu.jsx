@@ -23,6 +23,7 @@ const SettingsMenu = ({
     isRtl,
     onClickDesktopSettings,
     onOpenCustomAccent,
+    onOpenExtensionManager,
     onOpenCustomSettings,
     onRequestClose,
     onRequestOpen,
@@ -67,6 +68,11 @@ const SettingsMenu = ({
                         />
                         <TWAccentThemeMenu />
                     </React.Fragment>
+                )}
+                {onOpenExtensionManager && (
+                    <MenuItem onClick={onOpenExtensionManager}>
+                        {'Extension Manager'}
+                    </MenuItem>
                 )}
                 {onOpenCustomAccent && (
                     <MenuItem onClick={onOpenCustomAccent}>
