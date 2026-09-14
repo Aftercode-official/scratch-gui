@@ -169,9 +169,6 @@
     font-weight: 500;
 }
 
-
-
-
 :global([class*="library-modal_header"]),
 :global([class*="extension-library"] [class*="header"]) {
     position: sticky;
@@ -185,7 +182,7 @@
 
 :global([class*="library-scroll-grid"]),
 :global([class*="library-modal_body"]) {
-    overflow-y: auto !important;
+    overflow-y: none !important;
     max-height: 80vh;
 }
 
