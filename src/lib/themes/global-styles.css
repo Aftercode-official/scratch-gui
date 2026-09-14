@@ -169,6 +169,26 @@
     font-weight: 500;
 }
 
+/* --- Cố định header của thư viện Extension trong Scratch GUI --- */
+
+/* 1. Tìm thanh header/thanh chứa tiêu đề và ô tìm kiếm bên trong modal và ghim nó lại */
+:global([class*="library-modal_header"]),
+:global([class*="extension-library"] [class*="header"]) {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    background-color: color-mix(in srgb, $popover-background 95%, #000) !important; /* Tạo nền đục nhẹ để chữ bên dưới không bị lẫn lên khi cuộn */
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+}
+
+/* 2. Đảm bảo khung cuộn (scroll container) bọc các card mở rộng hoạt động đúng với position sticky */
+:global([class*="library-scroll-grid"]),
+:global([class*="library-modal_body"]) {
+    overflow-y: auto !important;
+    max-height: 80vh; /* Giới hạn chiều cao modal để kích hoạt thanh cuộn nội bộ */
+}
+
 /* ScratchAdddons editor-dark-mode compatibility */
 :root {
     --editorDarkMode-primary: $looks-secondary;
