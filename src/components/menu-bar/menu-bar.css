@@ -101,10 +101,17 @@
 }
 
 .uploadProjectButton {
-    background-color: white;
-    fontSize : 11px;
-    color: #5d41ac;
+    background-color: transparent;
+    font-size: 11px;
+    color: #ffffff;
     height: 34px;
+    border: 1px solid #ffffff;
+    border-radius: 4px;
+    padding: 0 10px;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
 }
 
 .uploadProjectIcon {

@@ -472,6 +472,11 @@ async handleClickUploadProject () {
         alert("Không thể đóng gói dự án: " + error.message);
     }
 }
+    handleReturnHomePage(){
+        const Return = "https://danvpr.github.io/workshop/"
+
+        window.location.href = Return;
+    }
     handleClickSeeInside () {
         this.props.onClickSeeInside();
     }
@@ -575,6 +580,18 @@ async handleClickUploadProject () {
                     styles.menuBar
                 )}
             >
+                <div className={styles.menuBarItem}>
+                            <Button
+                                onClick={this.handleReturnHomePage}
+                            >
+                                <img
+                                    src={DANVwsIcon}
+                                    draggable={false}
+                                    width={190}
+                                    height={48}
+                                />
+                            </Button>
+                    </div>
                 <div className={styles.mainMenu}>
                     <div className={styles.fileGroup}>
                         {this.props.errors.length > 0 && <div>
@@ -1091,11 +1108,6 @@ async handleClickUploadProject () {
                             className={styles.uploadProjectButton}
                                 onClick={this.handleClickUploadProject}
                             >
-                                <img
-                                    src={DANVwsIcon}
-                                    draggable={false}
-                                    className={styles.uploadProjectIcon}
-                                />
                                 <FormattedMessage
                                     defaultMessage="Chia sẻ lên DANVworkshop"
                                     description="Button to upload a project"
