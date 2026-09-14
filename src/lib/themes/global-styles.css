@@ -7,20 +7,166 @@
     color-scheme: var(--color-scheme);
 }
 
-/* popover is used by gui and paint */
-/* some of these are duplicated over there too; !important makes sure these win */
-:global(.Popover) {
-    color-scheme: light !important;
+/* --- Overlay (nền mờ) phía sau modal: tối trung tính + blur nhẹ --- */
+:global(.ReactModal__Overlay),
+:global([class*="modal-overlay"]),
+:global([class*="modal_modal-overlay"]) {
+    background-color: rgba(0, 0, 0, 0.55) !important;
+    backdrop-filter: blur(5px);
+    -webkit-backdrop-filter: blur(5px);
+    will-change: backdrop-filter, opacity;
+    transform: translateZ(0);
+    opacity: 0;
+    animation: modal-overlay-fade-in 0.2s ease forwards;
 }
-:global(.Popover-body) {
+
+@keyframes modal-overlay-fade-in {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+/* --- Khung modal: kính mờ tối trung tính (không lệ thuộc màu category) --- */
+:global(.modal-content),
+:global([class*="modal-content"]),
+:global([class*="modal_modal-content"]) {
+    background-color: color-mix(in srgb, $popover-background 70%, transparent) !important;
+    backdrop-filter: blur(5px) saturate(140%);
+    -webkit-backdrop-filter: blur(5px) saturate(140%);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 16px;
+    box-shadow:
+        0 20px 48px rgba(0, 0, 0, 0.5),
+        inset 0 1px 0 rgba(255, 255, 255, 0.08);
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    animation: modal-content-pop-in 0.22s cubic-bezier(0.2, 0.8, 0.3, 1.1) forwards;
+}
+
+@keyframes modal-content-pop-in {
+    from {
+        opacity: 0;
+        transform: translateY(8px) scale(0.98);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+}
+
+:global(.body),
+:global([class*="modal-body"]),
+:global([class*="modal_body"]) {
+    padding: 24px;
+    background-color: transparent !important;
     color: $text-primary !important;
-    background: $popover-background !important;
-    border: 1px solid $ui-black-transparent !important;
-    box-shadow: 0px 0px 8px 1px $shadow !important;
+    font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+    display: flex;
+    flex-direction: column;
 }
-:global(.Popover-tipShape) {
-    fill: $popover-background !important;
-    stroke: $ui-black-transparent !important;
+
+:global(.body h2),
+:global([class*="modal-body"] h2) {
+    margin: 0;
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: $text-primary !important;
+    letter-spacing: 0.2px;
+}
+
+:global(.body > div:not(.button-row)) {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+/* --- Nền trong suốt cho lưới extension và từng card --- */
+:global([class*="library-scroll-grid"]) {
+    background-color: transparent !important;
+}
+
+:global([class*="library_item"]),
+:global([class*="libraryItem"]) {
+    background-color: light-dark(
+        color-mix(in srgb, white 12%, transparent),
+        color-mix(in srgb, white 6%, transparent)
+    ) !important;
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.12) !important;
+    position: relative;
+    overflow: hidden;
+    transition: background-color 0.2s ease;
+}
+
+:global([class*="library_item"]:hover),
+:global([class*="libraryItem"]:hover) {
+    background-color: light-dark(
+        color-mix(in srgb, white 20%, transparent),
+        color-mix(in srgb, white 12%, transparent)
+    ) !important;
+}
+
+/* Panel tên/mô tả: đè lên đáy ảnh kiểu kính mờ (frosted glass) thay vì khối đặc */
+:global([class*="library_item"] > div:last-child),
+:global([class*="libraryItem"] > div:last-child) {
+    position: relative;
+    margin-top: -18px;
+    padding-top: 22px !important;
+    border-radius: 0 0 12px 12px;
+    background-color: light-dark(
+        color-mix(in srgb, white 55%, transparent),
+        color-mix(in srgb, black 55%, transparent)
+    ) !important;
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+    transition: background-color 0.2s ease;
+}
+
+:global([class*="library_item"]:hover > div:last-child),
+:global([class*="libraryItem"]:hover > div:last-child) {
+    background-color: light-dark(
+        color-mix(in srgb, white 68%, transparent),
+        color-mix(in srgb, black 68%, transparent)
+    ) !important;
+}
+
+:global(.load-button) {
+    padding: 9px 22px;
+    background-color: $extensions-primary;
+    color: #ffffff;
+    border: none;
+    border-radius: 20px;
+    font-weight: 600;
+    font-size: 0.9rem;
+    cursor: pointer;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    transition: background-color 0.2s ease, transform 0.1s ease, box-shadow 0.2s ease;
+}
+
+:global(.load-button:hover:not(:disabled)) {
+    filter: brightness(1.15);
+    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.25);
+}
+
+:global(.load-button:active:not(:disabled)) {
+    transform: translateY(1px);
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+}
+
+:global(.load-button:disabled) {
+    cursor: not-allowed;
+    opacity: 0.35;
+    background-color: rgba(255, 255, 255, 0.15);
+    color: $text-primary !important;
+    box-shadow: none;
+}
+
+:global(.error) {
+    color: #ff6b6b;
+    font-size: 0.85rem;
+    margin-top: -10px;
+    font-weight: 500;
 }
 
 /* ScratchAdddons editor-dark-mode compatibility */
@@ -31,7 +177,6 @@
     --editorDarkMode-border: $ui-black-transparent;
     --editorDarkMode-accent: $ui-modal-background;
     --editorDarkMode-categoryMenu-text: $text-primary;
-    --editorDarkMode-accent-text: $text-primary;
     --editorDarkMode-page: $ui-primary;
     --editorDarkMode-highlightText: $looks-secondary;
 }

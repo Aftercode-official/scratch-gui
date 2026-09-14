@@ -3,10 +3,14 @@
 .modal-content {
     width: 440px;
     max-width: 90vw;
-    background-color: #292929; /* Màu xám đặc trưng của modal Scratch Dark Mode */
-    border: 1px solid #3c3c3c;
-    border-radius: 8px; /* Kiểu bo góc vừa phải, mang nét classic */
-    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+    background-color: color-mix(in srgb, $popover-background 65%, transparent) !important;
+    backdrop-filter: blur(20px) saturate(140%);
+    -webkit-backdrop-filter: blur(20px) saturate(140%);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 14px;
+    box-shadow:
+        0 16px 40px rgba(0, 0, 0, 0.5),
+        inset 0 1px 0 rgba(255, 255, 255, 0.08);
     overflow: hidden;
     display: flex;
     flex-direction: column;
@@ -14,8 +18,8 @@
 
 .body {
     padding: 24px;
-    background-color: #292929;
-    color: #d9d9d9;
+    background-color: transparent !important;
+    color: $text-primary !important;
     font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
     display: flex;
     flex-direction: column;
@@ -24,9 +28,10 @@
 
 .body h2 {
     margin: 0;
-    font-size: 1.2rem;
-    font-weight: 600;
-    color: #ffffff;
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: $text-primary !important;
+    letter-spacing: 0.2px;
 }
 
 /* Phần chọn màu hoặc các dòng tùy chỉnh */
@@ -36,40 +41,40 @@
     justify-content: space-between;
 }
 
-/* Khu vực chứa nút bấm đặt ở góc phải hoặc nằm ngang theo chuẩn form classic */
-.button-row, .load-button {
-    /* Đảm bảo các nút nằm gọn gàng, không bị tràn */
-}
-
 .load-button {
-    padding: 8px 20px;
-    background-color: #4c97ff;
-    color: white;
-    border: 1px solid rgba(0, 0, 0, 0.1);
-    border-radius: 16px; /* Bo tròn nhẹ nhàng */
-    font-weight: 500;
+    padding: 9px 22px;
+    background-color: $extensions-primary;
+    color: #ffffff;
+    border: none;
+    border-radius: 20px; /* Bo tròn kiểu pill-shape hiện đại */
+    font-weight: 600;
     font-size: 0.9rem;
     cursor: pointer;
-    transition: background-color 0.15s ease;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    transition: background-color 0.2s ease, transform 0.1s ease, box-shadow 0.2s ease;
 }
 
 .load-button:hover:not(:disabled) {
-    background-color: #3385ff;
+    filter: brightness(1.15); /* Tự động làm sáng màu gốc lên một chút khi hover rất mượt */
+    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.25);
 }
 
 .load-button:active:not(:disabled) {
-    background-color: #1a75ff;
+    transform: translateY(1px);
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
 }
 
 .load-button:disabled {
     cursor: not-allowed;
-    opacity: 0.4;
-    background-color: #555555;
-    color: #aaaaaa;
+    opacity: 0.35;
+    background-color: rgba(255, 255, 255, 0.15);
+    color: $text-primary !important;
+    box-shadow: none;
 }
 
 .error {
     color: #ff6b6b;
     font-size: 0.85rem;
     margin-top: -10px;
+    font-weight: 500;
 }

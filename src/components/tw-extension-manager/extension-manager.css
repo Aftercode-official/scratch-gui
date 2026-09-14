@@ -1,15 +1,22 @@
 @import "../../css/colors.css";
 
 .modal-content {
-    width: 560px;
-    min-height: 280px;
-    background-color: $ui-white;
+    max-width: 550px;
+    margin-top: 50px;
+    background-color: color-mix(in srgb, $popover-background 65%, transparent);
+    backdrop-filter: blur(20px) saturate(140%);
+    -webkit-backdrop-filter: blur(20px) saturate(140%);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 14px;
+    box-shadow:
+        0 16px 40px rgba(0, 0, 0, 0.5),
+        inset 0 1px 0 rgba(255, 255, 255, 0.08);
 }
 
 .body {
-    min-height: 220px;
-    padding: 24px;
-    background-color: $ui-white;
+    background: transparent;
+    color: $text-primary;
+    padding: 1.5rem 2.25rem;
 }
 
 .header {
@@ -22,6 +29,7 @@
     flex: 1;
     margin: 0 0 16px;
     font-size: 1.25rem;
+    color: $text-primary;
 }
 
 .refresh-button {
@@ -35,7 +43,9 @@
     padding: 0;
     overflow-y: auto;
     list-style: none;
-    border: 1px solid $ui-black-transparent;
+    background-color: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 8px;
 }
 
 .extension-item {
@@ -44,7 +54,12 @@
     justify-content: space-between;
     gap: 4px;
     padding: 12px;
-    border-bottom: 1px solid $ui-black-transparent;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    transition: background-color 0.15s ease;
+}
+
+.extension-item:hover {
+    background-color: rgba(255, 255, 255, 0.05);
 }
 
 .extension-item:last-child {
@@ -70,7 +85,9 @@
     color: $ui-white;
     background-color: #c0392b;
     border: 0;
+    border-radius: 6px;
     cursor: pointer;
+    transition: background-color 0.15s ease;
 }
 
 .remove-button:hover,
@@ -103,5 +120,5 @@
 }
 
 .error {
-    color: #c0392b;
+    color: #ff6b6b;
 }
