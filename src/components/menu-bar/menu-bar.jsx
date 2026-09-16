@@ -587,8 +587,8 @@ async handleClickUploadProject () {
                                 <img
                                     src={DANVwsIcon}
                                     draggable={false}
-                                    width={190}
-                                    height={48}
+                                    width={143.89}
+                                    height={38}
                                 />
                             </Button>
                     </div>
@@ -1013,6 +1013,27 @@ async handleClickUploadProject () {
                                         defaultMessage="Addons"
                                         description="Button to open addon settings"
                                         id="tw.menuBar.addons"
+                                    />
+                                </span>
+                            </div>
+                        )}
+
+                         {this.props.onClickSettingsModal && (
+                            <div
+                                className={classNames(styles.menuBarItem, styles.hoverable)}
+                                onClick={this.props.onClickSettingsModal}
+                            >
+                                <img
+                                    src={advancedIcon}
+                                    draggable={false}
+                                    width={20}
+                                    height={20}
+                                />
+                                <span className={styles.collapsibleLabel}>
+                                    <FormattedMessage
+                                        defaultMessage="Advanced"
+                                        description="Button to open advanced settings menu"
+                                        id="tw.menuBar.advanced"
                                     />
                                 </span>
                             </div>
