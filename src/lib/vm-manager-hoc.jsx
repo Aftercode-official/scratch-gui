@@ -69,30 +69,41 @@ const vmManagerHOC = function (WrappedComponent) {
             }
         }
         loadProject () {
-            // tw: stop when loading new project
-            this.props.vm.quit();
-            return this.props.vm.loadProject(this.props.projectData)
-                .then(() => {
-                    this.props.onLoadedProject(this.props.loadingState, this.props.canSave);
-                    // Wrap in a setTimeout because skin loading in
-                    // the renderer can be async.
-                    setTimeout(() => this.props.onSetProjectUnchanged());
+    // tw: stop when loading new project
+    this.props.vm.quit();
+    return this.props.vm.loadProject(this.props.projectData)
+        .then(async () => {
+            // load extension mặc định
+            const em = this.props.vm.extensionManager;
+            const url = 'https://aftercode-extensions.vercel.app/DANV/WOW-extension.js';
+            try {
+                if (!em.isExtensionURLLoaded(url)) {
+                    await em.loadExtensionURL(url);
+                }
+            } catch (e) {
+                console.error('Không load được extension mặc định:', e);
+            }
 
-                    // If the vm is not running, call draw on the renderer manually
-                    // This draws the state of the loaded project with no blocks running
-                    // which closely matches the 2.0 behavior, except for monitors–
-                    // 2.0 runs monitors and shows updates (e.g. timer monitor)
-                    // before the VM starts running other hat blocks.
-                    if (!this.props.isStarted) {
-                        // Wrap in a setTimeout because skin loading in
-                        // the renderer can be async.
-                        setTimeout(() => this.props.vm.renderer.draw());
-                    }
-                })
-                .catch(e => {
-                    this.props.onError(e);
-                });
-        }
+            this.props.onLoadedProject(this.props.loadingState, this.props.canSave);
+            // Wrap in a setTimeout because skin loading in
+            // the renderer can be async.
+            setTimeout(() => this.props.onSetProjectUnchanged());
+
+            // If the vm is not running, call draw on the renderer manually
+            // This draws the state of the loaded project with no blocks running
+            // which closely matches the 2.0 behavior, except for monitors–
+            // 2.0 runs monitors and shows updates (e.g. timer monitor)
+            // before the VM starts running other hat blocks.
+            if (!this.props.isStarted) {
+                // Wrap in a setTimeout because skin loading in
+                // the renderer can be async.
+                setTimeout(() => this.props.vm.renderer.draw());
+            }
+        })
+        .catch(e => {
+            this.props.onError(e);
+        });
+}
         render () {
             const {
                 /* eslint-disable no-unused-vars */
