@@ -57,7 +57,7 @@ const handleClickAddonSettings = addonId => {
 
 const messages = defineMessages({
     defaultTitle: {
-        defaultMessage: 'A better place to creative',
+        defaultMessage: 'control all functions',
         description: 'Title of homepage',
         id: 'tw.guiDefaultTitle'
     }
