@@ -57,7 +57,7 @@ const handleClickAddonSettings = addonId => {
 
 const messages = defineMessages({
     defaultTitle: {
-        defaultMessage: 'control all functions',
+        defaultMessage: 'non-sandboxed',
         description: 'Title of homepage',
         id: 'tw.guiDefaultTitle'
     }
