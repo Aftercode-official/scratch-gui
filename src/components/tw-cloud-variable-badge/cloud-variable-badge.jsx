@@ -9,7 +9,7 @@ import {APP_NAME} from '../../lib/brand';
 const hosts = [
     {
         name: 'US East',
-        cloudHost: 'wss://cloud-server-production-aftercode.up.railway.app/'
+        cloudHost: 'wss://clouddata.turbowarp.org'
     }
 ];
 
