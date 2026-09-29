@@ -125,7 +125,7 @@ const mapGalleryExtension = (extension, source) => ({
 
     iconURL: extension.image ? `${source.baseURL}${extension.image}` : defaultExtensionBanner,
 
-    tags: (extension.name.includes('DANV') || (extension.by && JSON.stringify(extension.by).includes('StudioDANV')))
+    tags: extension.name.includes('DANV')
         ? [source.tag, 'ws']
         : [source.tag],
 
