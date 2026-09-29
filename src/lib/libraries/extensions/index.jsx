@@ -379,7 +379,7 @@ export default [
                 id="tw.customReporters.description"
             />
         ),
-        tags: ['ws', 'ac', 'tw'],
+        tags: ['ac', 'tw'],
         incompatibleWithScratch: true,
         featured: true
     },
