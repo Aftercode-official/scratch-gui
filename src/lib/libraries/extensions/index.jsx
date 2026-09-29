@@ -379,7 +379,7 @@ export default [
                 id="tw.customReporters.description"
             />
         ),
-        tags: ['ac','tw'],
+        tags: ['ws', 'ac', 'tw'],
         incompatibleWithScratch: true,
         featured: true
     },
@@ -424,13 +424,19 @@ export default [
                 id="tw.customExtension.description"
             />
         ),
-        tags: ['ac','tw'],
+        tags: ['ws', 'ac', 'tw'],
         featured: true
         // Not marked as incompatible with Scratch so that clicking on it doesn't show a prompt
     },
 ];
 
 const gallerySourceDisplay = {
+    danvworkshop: {
+        name: 'DANVworkshop Gallery',
+        href: 'https://turbows.pages.dev/extensions',
+        iconURL: galleryIcon,
+        tag: 'ws'
+    },
     aftercode: {
         name: 'Aftercode Extension Gallery',
         href: 'https://aftercode-extensions.vercel.app/',
@@ -459,6 +465,11 @@ const createGalleryStatusItem = (sourceId, description) => {
 };
 
 export const galleryStatusItems = {
+    danvworkshop: {
+        loading: createGalleryStatusItem('danvworkshop', 'Loading DANVworkshop extension gallery...'),
+        more: createGalleryStatusItem('danvworkshop', 'Learn more about DANVworkshop extensions.'),
+        error: createGalleryStatusItem('danvworkshop', 'Error loading DANVworkshop extension gallery.')
+    },
     aftercode: {
         loading: createGalleryStatusItem('aftercode', 'Loading Aftercode extension gallery...'),
         more: createGalleryStatusItem('aftercode', 'Learn more about extensions at aftercode-extensions.vercel.app.'),
