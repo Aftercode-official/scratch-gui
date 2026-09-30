@@ -3,7 +3,7 @@ const guiColors = {
     'motion-primary-transparent': '#ffee00d8',
     'motion-tertiary': '#fcff40',
 
-    'looks-secondary': '#eede00',
+    'looks-secondary': '#ffd700',
     'looks-transparent': '#ffd90059',
     'looks-light-transparent': '#fff34d26',
     'looks-secondary-dark': 'rgb(183, 176, 78)',
