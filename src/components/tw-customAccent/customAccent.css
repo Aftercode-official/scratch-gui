@@ -1,0 +1,80 @@
+@import "../../css/colors.css";
+
+.modal-content {
+    width: 440px;
+    max-width: 90vw;
+    background-color: color-mix(in srgb, $popover-background 65%, transparent) !important;
+    backdrop-filter: blur(20px) saturate(140%);
+    -webkit-backdrop-filter: blur(20px) saturate(140%);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 14px;
+    box-shadow:
+        0 16px 40px rgba(0, 0, 0, 0.5),
+        inset 0 1px 0 rgba(255, 255, 255, 0.08);
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+}
+
+.body {
+    padding: 24px;
+    background-color: transparent !important;
+    color: $text-primary !important;
+    font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+.body h2 {
+    margin: 0;
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: $text-primary !important;
+    letter-spacing: 0.2px;
+}
+
+/* Phần chọn màu hoặc các dòng tùy chỉnh */
+.body > div:not(.button-row) {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.load-button {
+    padding: 9px 22px;
+    background-color: $extensions-primary;
+    color: #ffffff;
+    border: none;
+    border-radius: 20px; /* Bo tròn kiểu pill-shape hiện đại */
+    font-weight: 600;
+    font-size: 0.9rem;
+    cursor: pointer;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    transition: background-color 0.2s ease, transform 0.1s ease, box-shadow 0.2s ease;
+}
+
+.load-button:hover:not(:disabled) {
+    filter: brightness(1.15); /* Tự động làm sáng màu gốc lên một chút khi hover rất mượt */
+    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.25);
+}
+
+.load-button:active:not(:disabled) {
+    transform: translateY(1px);
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+}
+
+.load-button:disabled {
+    cursor: not-allowed;
+    opacity: 0.35;
+    background-color: rgba(255, 255, 255, 0.15);
+    color: $text-primary !important;
+    box-shadow: none;
+}
+
+.error {
+    color: #ff6b6b;
+    font-size: 0.85rem;
+    margin-top: -10px;
+    font-weight: 500;
+}

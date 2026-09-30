@@ -1,0 +1,124 @@
+@import "../../css/colors.css";
+
+.modal-content {
+    max-width: 550px;
+    margin-top: 50px;
+    background-color: color-mix(in srgb, $popover-background 65%, transparent);
+    backdrop-filter: blur(20px) saturate(140%);
+    -webkit-backdrop-filter: blur(20px) saturate(140%);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 14px;
+    box-shadow:
+        0 16px 40px rgba(0, 0, 0, 0.5),
+        inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+
+.body {
+    background: transparent;
+    color: $text-primary;
+    padding: 1.5rem 2.25rem;
+}
+
+.header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.header h2 {
+    flex: 1;
+    margin: 0 0 16px;
+    font-size: 1.25rem;
+    color: $text-primary;
+}
+
+.refresh-button {
+    margin-bottom: 16px;
+    padding: 6px 12px;
+}
+
+.extension-list {
+    max-height: 240px;
+    margin: 0;
+    padding: 0;
+    overflow-y: auto;
+    list-style: none;
+    background-color: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 8px;
+}
+
+.extension-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 4px;
+    padding: 12px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    transition: background-color 0.15s ease;
+}
+
+.extension-item:hover {
+    background-color: rgba(255, 255, 255, 0.05);
+}
+
+.extension-item:last-child {
+    border-bottom: 0;
+}
+
+.extension-details {
+    min-width: 0;
+}
+
+.extension-details span {
+    overflow: hidden;
+    color: $text-primary;
+    font-size: 0.8rem;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.remove-button,
+.remove-all-button {
+    margin-bottom: 16px;
+    padding: 8px 12px;
+    color: $ui-white;
+    background-color: #c0392b;
+    border: 0;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: background-color 0.15s ease;
+}
+
+.remove-button:hover,
+.remove-all-button:hover {
+    background-color: #a93226;
+}
+
+.remove-button {
+    flex: 0 0 auto;
+}
+
+.remove-all-button:disabled {
+    cursor: not-allowed;
+    opacity: 0.5;
+}
+
+.empty {
+    margin: 24px 0;
+    color: $text-primary;
+}
+
+.load-button {
+    margin-top: 16px;
+    padding: 8px 16px;
+}
+
+.load-button:disabled {
+    cursor: not-allowed;
+    opacity: 0.5;
+}
+
+.error {
+    color: #ff6b6b;
+}
