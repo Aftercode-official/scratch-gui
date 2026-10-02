@@ -83,7 +83,7 @@
     "redux-throttle": "0.1.1",
     "scratch-audio": "github:TurboWarp/scratch-audio#develop",
     "scratch-blocks": "github:Aftercode-official/Aftercode-blocks",
-    "scratch-paint": "github:TurboWarp/scratch-paint#develop",
+    "scratch-paint": "github:Aftercode-official/Aftercode-paint#develop",
     "scratch-render": "github:TurboWarp/scratch-render#develop",
     "scratch-vm": "github:Aftercode-official/aftercode-scratch-vm#main",
     "style-loader": "^0.23.0",
