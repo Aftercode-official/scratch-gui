@@ -4,6 +4,7 @@ const Cast = require('../util/cast');
 const Clone = require('../util/clone');
 const Target = require('../engine/target');
 const StageLayering = require('../engine/stage-layering');
+const uid = require('../util/uid');
 
 /**
  * Rendered target: instance of a sprite (clone), or the stage.
@@ -36,6 +37,12 @@ class RenderedTarget extends Target {
          * @type {?Number}
          */
         this.drawableID = null;
+
+        /**
+         * Name of the camera assigned to a target.
+         * @type {string}
+         */
+        this.cameraName = 'default';
 
         /**
          * Drag state of this rendered target. If true, x/y position can't be
@@ -177,6 +184,7 @@ class RenderedTarget extends Target {
     initDrawable (layerGroup) {
         if (this.renderer) {
             this.drawableID = this.renderer.createDrawable(layerGroup);
+            this.renderer.bindDrawableToCamera(this.drawableID, this.cameraName);
         }
         // If we're a clone, start the hats.
         if (!this.isOriginal) {
@@ -574,6 +582,74 @@ class RenderedTarget extends Target {
     }
 
     /**
+     * Add an asset, taking care to avoid duplicate names.
+     * @param {!object} assetObject Object representing the asset.
+     * @param {?int} index Index at which to add asset
+     */
+    addAsset (assetObject, index) {
+        const usedNames = this.sprite.assets.map(asset => asset.name);
+        assetObject.name = StringUtil.unusedName(assetObject.name, usedNames);
+        if (typeof index === 'number' && !isNaN(index)) {
+            this.sprite.assets.splice(index, 0, assetObject);
+        } else {
+            this.sprite.assets.push(assetObject);
+        }
+    }
+
+    /**
+     * Rename a asset, taking care to avoid duplicate names.
+     * @param {int} assetIndex - the index of the asset to be renamed.
+     * @param {string} newName - the desired new name of the asset (will be modified if already in use).
+     * @param {string} extension - the desired extension of the asset
+     */
+    renameAsset (assetIndex, newName, extension) {
+        const usedNames = this.sprite.assets
+            .filter((asset, index) => assetIndex !== index)
+            .map(asset => asset.name);
+        const oldName = this.sprite.assets[assetIndex].name;
+        const newUnusedName = StringUtil.unusedName(newName, usedNames);
+        const asset = this.sprite.assets[assetIndex];
+        asset.name = newUnusedName;
+        asset.dataFormat = extension;
+        this.blocks.updateAssetName(oldName, newUnusedName, 'asset');
+    }
+
+    /**
+     * Delete an asset by index.
+     * @param {number} index Asset index to be deleted
+     * @return {object} The deleted asset object, or null if no asset was deleted.
+     */
+    deleteAsset (index) {
+        // Make sure the asset index is not out of bounds
+        if (index < 0 || index >= this.sprite.assets.length) {
+            return null;
+        }
+        // Delete the asset at the given index
+        const deletedAsset = this.sprite.assets.splice(index, 1)[0];
+        this.runtime.requestTargetsUpdate(this);
+        return deletedAsset;
+    }
+
+
+    /**
+     * Reorder asset list by moving asset at assetIndex to newIndex.
+     * @param {!number} assetIndex Index of the asset to move.
+     * @param {!number} newIndex New index for that asset.
+     * @returns {boolean} If a change occurred (i.e. if the indices do not match)
+     */
+    reorderAsset (assetIndex, newIndex) {
+        newIndex = MathUtil.clamp(newIndex, 0, this.sprite.assets.length - 1);
+        assetIndex = MathUtil.clamp(assetIndex, 0, this.sprite.assets.length - 1);
+
+        if (newIndex === assetIndex) return false;
+
+        const asset = this.sprite.assets[assetIndex];
+        this.deleteAsset(assetIndex);
+        this.addAsset(asset, newIndex);
+        return true;
+    }
+
+    /**
      * Update the rotation style.
      * @param {!string} rotationStyle New rotation style.
      */
@@ -674,6 +750,14 @@ class RenderedTarget extends Target {
      */
     getSounds () {
         return this.sprite.sounds;
+    }
+
+    /** *
+     * Get full asset list
+     * @returns {object[]} list of assets
+     */
+    getAssets () {
+        return this.sprite.assets;
     }
 
     /**
@@ -796,7 +880,7 @@ class RenderedTarget extends Target {
     /**
      * Return whether touching any of a named sprite's clones.
      * @param {string} spriteName Name of the sprite.
-     * @return {boolean} True iff touching a clone of the sprite.
+     * @return {boolean} True if touching a clone of the sprite.
      */
     isTouchingSprite (spriteName) {
         spriteName = Cast.toString(spriteName);
@@ -811,6 +895,18 @@ class RenderedTarget extends Target {
             .map(clone => clone.drawableID);
         return this.renderer.isTouchingDrawables(
             this.drawableID, drawableCandidates);
+    }
+
+    /**
+     * Return whether touching a specific target instance.
+     * @param {Target} target The target instance.
+     * @return {boolean} True if touching the specific target.
+     */
+    isTouchingTarget (target) {
+        if (!target || !this.renderer || target.dragging) {
+            return false;
+        }
+        return this.renderer.isTouchingDrawables(this.drawableID, [target.drawableID]);
     }
 
     /**
@@ -977,6 +1073,7 @@ class RenderedTarget extends Target {
         newClone.currentCostume = this.currentCostume;
         newClone.rotationStyle = this.rotationStyle;
         newClone.effects = Clone.simple(this.effects);
+        newClone.cameraName = this.cameraName;
         newClone.variables = this.duplicateVariables();
         newClone._edgeActivatedHatValues = Clone.simple(this._edgeActivatedHatValues);
         newClone.initDrawable(StageLayering.SPRITE_LAYER);
@@ -1003,6 +1100,28 @@ class RenderedTarget extends Target {
             newTarget.rotationStyle = this.rotationStyle;
             newTarget.effects = JSON.parse(JSON.stringify(this.effects));
             newTarget.variables = this.duplicateVariables(newTarget.blocks);
+            const blockIds = newSprite._duplicateBlockIdMap || {};
+            for (const comment of Object.values(this.comments)) {
+                const blockId = comment.blockId ? blockIds[comment.blockId] : null;
+                newTarget.createComment(uid(), blockId, comment.text, comment.x,
+                    comment.y, comment.width, comment.height, comment.minimized,
+                    comment.colour);
+            }
+            for (const group of Object.values(this.groups)) {
+                newTarget.createGroup({
+                    title: group.title,
+                    colour: group.colour,
+                    x: group.x,
+                    y: group.y,
+                    width: group.width,
+                    height: group.height,
+                    expandedWidth: group.expandedWidth,
+                    expandedHeight: group.expandedHeight,
+                    collapsed: group.collapsed,
+                    blocks: group.blocks.map(id => blockIds[id]).filter(Boolean)
+                });
+            }
+            delete newSprite._duplicateBlockIdMap;
             newTarget.updateAllDrawableProperties();
             return newTarget;
         });
@@ -1033,7 +1152,9 @@ class RenderedTarget extends Target {
         const isXChanged = Object.prototype.hasOwnProperty.call(data, 'x');
         const isYChanged = Object.prototype.hasOwnProperty.call(data, 'y');
         if (isXChanged || isYChanged) {
-            this.setXY(isXChanged ? data.x : this.x, isYChanged ? data.y : this.y, force);
+            const x = isXChanged ? data.x : this.x;
+            const y = isYChanged ? data.y : this.y;
+            this.setXY(x, y, force);
         }
         if (Object.prototype.hasOwnProperty.call(data, 'direction')) {
             this.setDirection(data.direction);
@@ -1073,9 +1194,11 @@ class RenderedTarget extends Target {
      */
     toJSON () {
         const costumes = this.getCostumes();
+        const camera = this.renderer.getCamera(this.cameraName);
         return {
             id: this.id,
             name: this.getName(),
+            folderId: this.folderId || null,
             isStage: this.isStage,
             x: this.x,
             y: this.y,
@@ -1088,15 +1211,24 @@ class RenderedTarget extends Target {
             visible: this.visible,
             rotationStyle: this.rotationStyle,
             comments: this.comments,
+            groups: this.groups,
             blocks: this.blocks._blocks,
             variables: this.variables,
             costumes: costumes,
             sounds: this.getSounds(),
+            assets: this.getAssets(),
             textToSpeechLanguage: this.textToSpeechLanguage,
             tempo: this.tempo,
             volume: this.volume,
             videoTransparency: this.videoTransparency,
-            videoState: this.videoState
+            videoState: this.videoState,
+            camera: {
+                name: camera.name,
+                x: camera.x,
+                y: camera.y,
+                zoom: camera.zoom,
+                direction: camera.direction
+            }
 
         };
     }

@@ -172,7 +172,78 @@ const deserializeCostume = function (costume, runtime, zip, assetFileName, textL
     ]);
 };
 
+/**
+ * Deserializes asset from file into storage cache so that it can
+ * be loaded into the runtime.
+ * @param {object} asset Descriptor for asset from sb3 file
+ * @param {Runtime} runtime The runtime containing the storage to cache the asset in
+ * @param {JSZip} zip The zip containing the asset file being described by `asset`
+ * @param {string} assetFileName Optional file name for the given asset
+ * (sb2 files have filenames of the form [int].[ext],
+ * sb3 files have filenames of the form [md5].[ext])
+ * @return {Promise} Promise that resolves after the described asset has been stored
+ * into the runtime storage cache, the asset was already stored, or an error has
+ * occurred.
+ */
+const deserializeAsset = function (asset, runtime, zip, assetFileName) {
+    const fileName = assetFileName ? assetFileName : asset.md5;
+    const storage = runtime.storage;
+    if (!storage) {
+        log.warn('No storage module present; cannot load asset: ', fileName);
+        return Promise.resolve(null);
+    }
+
+    // Override the contentType to match the contentType of the file provided
+    const AssetType = structuredClone(storage.AssetType.Asset);
+    AssetType.contentType = asset.contentType;
+
+    if (!zip) { // Zip will not be provided if loading project json from server
+        return storage.load(AssetType, asset.assetId, asset.dataFormat)
+            .then(loadedAsset => {
+                if (!loadedAsset) {
+                    return null;
+                }
+                asset.asset = loadedAsset;
+                asset.assetId = loadedAsset.assetId;
+                asset.md5 = `${loadedAsset.assetId}.${loadedAsset.dataFormat}`;
+                return asset;
+            });
+    }
+
+    let assetFile = zip.file(fileName);
+    if (!assetFile) {
+        // look for assetfile in a flat list of files, or in a folder
+        const fileMatch = new RegExp(`^([^/]*/)?${fileName}$`);
+        assetFile = zip.file(fileMatch)[0]; // use first matching file
+    }
+
+    if (!assetFile) {
+        log.error(`Could not find asset file associated with the ${asset.name} asset.`);
+        return Promise.resolve(null);
+    }
+
+    if (!JSZip.support.uint8array) {
+        log.error('JSZip uint8array is not supported in this browser.');
+        return Promise.resolve(null);
+    }
+
+    return assetFile.async('uint8array').then(data => storage.createAsset(
+        AssetType,
+        asset.dataFormat,
+        data,
+        null,
+        true
+    ))
+        .then(createdAsset => {
+            asset.asset = createdAsset;
+            asset.assetId = createdAsset.assetId;
+            asset.md5 = `${createdAsset.assetId}.${createdAsset.dataFormat}`;
+            return asset;
+        });
+};
+
 module.exports = {
     deserializeSound,
-    deserializeCostume
+    deserializeCostume,
+    deserializeAsset
 };

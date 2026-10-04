@@ -70,6 +70,18 @@ class _StackFrame {
          * @type {object}
          */
         this.op = null;
+
+        /**
+         * Previous execution target to restore when this frame unwinds.
+         * @type {?Target}
+         */
+        this.returnToTarget = null;
+
+        /**
+         * Previous block container to restore when this frame unwinds.
+         * @type {?Blocks}
+         */
+        this.returnToBlockContainer = null;
     }
 
     /**
@@ -87,6 +99,8 @@ class _StackFrame {
         this.params = null;
         this.executionContext = null;
         this.op = null;
+        this.returnToTarget = null;
+        this.returnToBlockContainer = null;
 
         return this;
     }
@@ -166,6 +180,12 @@ class Thread {
         this.isKilled = false;
 
         /**
+         * Whether the thread is paused in the middle of execution.
+         * @type {boolean}
+         */
+        this.isPaused = false;
+
+        /**
          * Target of this thread.
          * @type {?Target}
          */
@@ -201,6 +221,8 @@ class Thread {
         this.triedToCompile = false;
 
         this.isCompiled = false;
+
+        this.stackClick = false;
 
         // compiler data
         // these values only make sense if isCompiled == true
@@ -306,7 +328,12 @@ class Thread {
      * @return {string} Block ID popped from the stack.
      */
     popStack () {
-        _StackFrame.release(this.stackFrames.pop());
+        const frame = this.stackFrames.pop();
+        if (frame && (frame.returnToTarget || frame.returnToBlockContainer)) {
+            this.target = frame.returnToTarget || this.target;
+            this.blockContainer = frame.returnToBlockContainer || this.target.blocks;
+        }
+        _StackFrame.release(frame);
         return this.stack.pop();
     }
 
@@ -316,7 +343,7 @@ class Thread {
     stopThisScript () {
         let blockID = this.peekStack();
         while (blockID !== null) {
-            const block = this.target.blocks.getBlock(blockID);
+            const block = this.blockContainer && this.blockContainer.getBlock(blockID);
 
             // Reporter form of procedures_call
             if (this.peekStackFrame().waitingReporter) {
@@ -430,6 +457,22 @@ class Thread {
         return this.peekStack() === this.topBlock;
     }
 
+    /**
+     * Get the bottom (last) block id in this thread's stack.
+     * @returns {?string} The bottom block id, or null if not found.
+     */
+    getBottomBlockId () {
+        if (!this.topBlock || !this.target || !this.target.blocks) return null;
+        let blockId = this.topBlock;
+        let nextBlock;
+        while (blockId) {
+            const blockObj = this.target.blocks.getBlock(blockId);
+            nextBlock = blockObj && blockObj.next;
+            if (!nextBlock) break;
+            blockId = nextBlock;
+        }
+        return blockId;
+    }
 
     /**
      * Switch the thread to the next block at the current level of the stack.
@@ -437,7 +480,7 @@ class Thread {
      * where execution proceeds from one block to the next.
      */
     goToNextBlock () {
-        const nextBlockId = this.target.blocks.getNextBlock(this.peekStack());
+        const nextBlockId = this.blockContainer.getNextBlock(this.peekStack());
         this.reuseStackForNextBlock(nextBlockId);
     }
 
@@ -451,8 +494,13 @@ class Thread {
         let callCount = 5; // Max number of enclosing procedure calls to examine.
         const sp = this.stackFrames.length - 1;
         for (let i = sp - 1; i >= 0; i--) {
-            const block = this.target.blocks.getBlock(this.stackFrames[i].op.id) ||
-                this.target.runtime.flyoutBlocks.getBlock(this.stackFrames[i].op.id);
+            const frameOp = this.stackFrames[i].op;
+            const block = frameOp ||
+                (frameOp && this.blockContainer.getBlock(frameOp.id)) ||
+                (frameOp && this.target.runtime.flyoutBlocks.getBlock(frameOp.id));
+            if (!block) {
+                continue;
+            }
             if (block.opcode === 'procedures_call' &&
                 block.mutation.proccode === procedureCode) {
                 return true;

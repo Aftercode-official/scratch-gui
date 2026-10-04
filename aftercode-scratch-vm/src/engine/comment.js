@@ -17,7 +17,7 @@ class Comment {
      * @param {boolean} minimized Whether the comment is minimized.
      * @constructor
      */
-    constructor (id, text, x, y, width, height, minimized) {
+    constructor (id, text, x, y, width, height, minimized, colour) {
         this.id = id || uid();
         this.text = text;
         this.x = x;
@@ -25,13 +25,15 @@ class Comment {
         this.width = Math.max(Number(width), Comment.MIN_WIDTH);
         this.height = Math.max(Number(height), Comment.MIN_HEIGHT);
         this.minimized = minimized || false;
+        this.colour = typeof colour === 'string' ? colour : null;
         this.blockId = null;
     }
 
     toXML () {
         return `<comment id="${this.id}" x="${this.x}" y="${
             this.y}" w="${this.width}" h="${this.height}" pinned="${
-            this.blockId !== null}" minimized="${this.minimized}">${xmlEscape(this.text)}</comment>`;
+            this.blockId !== null}" minimized="${this.minimized}" colour="${this.colour || ''}">${
+            xmlEscape(this.text)}</comment>`;
     }
 
     // TODO choose min and defaults for width and height

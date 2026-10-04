@@ -23,6 +23,8 @@
  * @property {ReporterScope} [reporterScope] - if this block is a reporter, this is the scope/context for its value.
  * @property {Boolean} [isEdgeActivated] - sets whether a hat block is edge-activated.
  * @property {Boolean} [shouldRestartExistingThreads] - sets whether a hat/event block should restart existing threads.
+ * @property {Boolean} [duplicateOnDrag] - sets whether a block can duplicate on drag,
+ * this will also hide it from pallete.
  * @property {int} [branchCount] - for flow control blocks, the number of branches/substacks for this block.
  * @property {Object.<ExtensionArgumentMetadata>} [arguments] - map of argument placeholder to metadata about each arg.
  */
@@ -32,11 +34,24 @@
  * All the metadata needed to register an argument for an extension block.
  * @property {ArgumentType} type - the type of the argument (number, string, etc.)
  * @property {*} [defaultValue] - the default value of this argument.
+ * @property {Boolean} [canMultiline] - for string arguments, use a multiline
+ * text input which grows to display all lines.
  * @property {string} [menu] - the name of the menu to use for this argument, if any.
+ * @property {number} [min] - minimum value for a slider argument.
+ * @property {number} [max] - maximum value for a slider argument.
+ * @property {number} [precision] - step size for a slider argument.
  */
 
 /**
- * @typedef {ExtensionDynamicMenu|ExtensionMenuItems} ExtensionMenuMetadata
+ * @typedef {object} ExtensionDependentMenuMetadata
+ * Metadata for a menu whose options depend on another argument on the same block.
+ * @property {string} parentName - the name of the argument this menu depends on. The parent argument must occur first.
+ * @property {Object.<string, ExtensionMenuItems>} optionMapping - menu items keyed by parent argument value.
+ * @property {ExtensionMenuItems} [defaultOptions] - items used when the parent value has no mapping.
+ */
+
+/**
+ * @typedef {ExtensionDynamicMenu|ExtensionMenuItems|ExtensionDependentMenuMetadata} ExtensionMenuMetadata
  * All the metadata needed to register an extension drop-down menu.
  */
 

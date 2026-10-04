@@ -44,6 +44,7 @@ const OPERATORS = [
     createBinaryOperator('operator_add'),
     createBinaryOperator('operator_subtract'),
     createBinaryOperator('operator_divide'),
+    createBinaryOperator('operator_power'),
     createBinaryOperator('operator_multiply'),
     createBinaryOperator('operator_mod'),
 

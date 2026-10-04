@@ -1,6 +1,7 @@
 // @ts-check
 
 const log = require('../util/log');
+const Cast = require('../util/cast');
 const BlockType = require('../extension-support/block-type');
 const VariablePool = require('./variable-pool');
 const jsexecute = require('./jsexecute');
@@ -26,6 +27,7 @@ const {
 /* eslint-disable max-len */
 /* eslint-disable prefer-template */
 
+/** @param {string | null} string */
 const sanitize = string => {
     if (typeof string !== 'string') {
         log.warn(`sanitize got unexpected type: ${typeof string}`);
@@ -53,6 +55,11 @@ const functionNameVariablePool = new VariablePool('fun');
  */
 const generatorNameVariablePool = new VariablePool('gen');
 
+/**
+ * @param {IntermediateInput} input
+ * @param {IntermediateInput} other
+ * @returns {boolean}
+ */
 const isSafeInputForEqualsOptimization = (input, other) => {
     // Only optimize constants
     if (input.opcode !== InputOpcode.CONSTANT) return false;
@@ -73,6 +80,7 @@ const isSafeInputForEqualsOptimization = (input, other) => {
  * A frame contains some information about the current substack being compiled.
  */
 class Frame {
+    /** @param {boolean} isLoop */
     constructor (isLoop) {
         /**
          * Whether the current stack runs in a loop (while, for)
@@ -104,6 +112,7 @@ class JSGenerator {
         this.isWarp = script.isWarp;
         this.isProcedure = script.isProcedure;
         this.warpTimer = script.warpTimer;
+        this.allowReturns = false;
 
         /**
          * Stack of frames, most recent is last item.
@@ -119,6 +128,7 @@ class JSGenerator {
 
         this.localVariables = new VariablePool('a');
         this._setupVariablesPool = new VariablePool('b');
+        /** @type {Record<string, string>} */
         this._setupVariables = {};
 
         this.descendedIntoModulo = false;
@@ -127,6 +137,91 @@ class JSGenerator {
         this.debug = this.target.runtime.debug;
 
         this.oldCompilerStub = new oldCompilerCompatibility.JSGeneratorStub(this);
+
+        /** @type {{value: string, index: string}[] | null} */
+        this.foreachVarsStack = null;
+        /** @type {{value: string, index: string}[] | null} */
+        this.mapVarsStack = null;
+        /** @type {{value: string, index: string}[] | null} */
+        this.filterVarsStack = null;
+        /** @type {{value: string, index: string}[] | null} */
+        this.sortVarsStack = null;
+        /** @type {string[] | null} */
+        this.forEachInRangeStack = null;
+
+        /** @type {boolean} */
+        this.warnedUnsupportedAPI = false;
+    }
+
+    warnUnsupportedAPI () {
+        if (!this.warnedUnsupportedAPI) {
+            this.warnedUnsupportedAPI = true;
+            console.warn("You are using unsupported compiler API's which may break in the future.");
+        }
+    }
+
+    /** @param {Record<string, any>} node */
+    makeCompilerUtil (node) {
+        const gen = this;
+        return {
+            target: this.target,
+            runtime: this.target.runtime,
+            localVariables: this.localVariables,
+            isProcedure: this.isProcedure,
+            isWarp: this.isWarp,
+            warpTimer: this.warpTimer,
+            debug: this.debug,
+            isInHat: this.isInHat,
+            get _frames () {
+                gen.warnUnsupportedAPI();
+                return gen.frames;
+            },
+            get _currentFrame () {
+                gen.warnUnsupportedAPI();
+                return gen.currentFrame;
+            },
+            get _source () {
+                gen.warnUnsupportedAPI();
+                return gen.source;
+            },
+            get _ir () {
+                gen.warnUnsupportedAPI();
+                return gen.ir;
+            },
+            get _script () {
+                gen.warnUnsupportedAPI();
+                return gen.script;
+            },
+            /**
+             * @param {number} branchNum
+             * @param {boolean} isLoop
+             */
+            compileBranch: (branchNum, isLoop = false) =>
+                this.compileStackToSource(node.substacks[branchNum], isLoop),
+            /**
+             * @param {number} branchNum
+             * @param {string[]} parameters
+             * @param {string} fallback JavaScript source for the value returned when the branch reaches its end.
+             */
+            compileFunction: (branchNum, parameters = [], fallback = 'undefined') => {
+                const oldReturns = this.allowReturns;
+                this.allowReturns = true;
+                try {
+                    const body = this.compileStackToSource(node.substacks[branchNum], false);
+                    const compiledFunction =
+                        `function* (${parameters.join(', ')}) {\n${body}return ${fallback};\n}`;
+                    return `((compiledFunction, compiledThread, compiledProcedures) => ` +
+                        `function* (...compiledArguments) {\n` +
+                        `const previousProcedures = compiledThread.procedures;\n` +
+                        `compiledThread.procedures = compiledProcedures;\n` +
+                        `try {\nreturn yield* compiledFunction(...compiledArguments);\n` +
+                        `} finally {\ncompiledThread.procedures = previousProcedures;\n}\n` +
+                        `})((${compiledFunction}), thread, thread.procedures)`;
+                } finally {
+                    this.allowReturns = oldReturns;
+                }
+            }
+        };
     }
 
     /**
@@ -178,6 +273,10 @@ class JSGenerator {
         case InputOpcode.ADDON_CALL:
             return `(${this.descendAddonCall(node)})`;
 
+        case InputOpcode.CAST_ARRAY:
+            return `toArray(${this.descendInput(node.target)})`;
+        case InputOpcode.CAST_OBJECT:
+            return `toObject(${this.descendInput(node.target)})`;
         case InputOpcode.CAST_BOOLEAN:
             return `toBoolean(${this.descendInput(node.target)})`;
         case InputOpcode.CAST_NUMBER:
@@ -193,7 +292,7 @@ class JSGenerator {
         case InputOpcode.CAST_NUMBER_INDEX:
             return `(${this.descendInput(node.target.toType(InputType.NUMBER_OR_NAN))} | 0)`;
         case InputOpcode.CAST_STRING:
-            return `("" + ${this.descendInput(node.target)})`;
+            return `toString(${this.descendInput(node.target)})`;
         case InputOpcode.CAST_COLOR:
             return `colorToList(${this.descendInput(node.target)})`;
 
@@ -204,6 +303,18 @@ class JSGenerator {
         case InputOpcode.OLD_COMPILER_COMPATIBILITY_LAYER:
             return this.oldCompilerStub.descendInputFromNewCompiler(block);
 
+        case InputOpcode.EXT_COMPILED_BLOCK: {
+            const compileCall = node.func;
+
+            const args = Object.fromEntries(
+                Object.entries({...node.inputs, ...node.fields})
+                    .map(([name, input]) => [name, this.descendInput(input)])
+            );
+            const util = this.makeCompilerUtil(node);
+
+            return compileCall(args, util) || '';
+        }
+
         case InputOpcode.CONSTANT:
             if (block.isAlwaysType(InputType.NUMBER)) {
                 if (typeof node.value !== 'number') throw new Error(`JS: '${block.type}' type constant had ${typeof node.value} type value. Expected number.`);
@@ -212,6 +323,12 @@ class JSGenerator {
             } else if (block.isAlwaysType(InputType.BOOLEAN)) {
                 if (typeof node.value !== 'boolean') throw new Error(`JS: '${block.type}' type constant had ${typeof node.value} type value. Expected boolean.`);
                 return node.value.toString();
+            } else if (block.isAlwaysType(InputType.OBJECT)) {
+                if (typeof node.value !== 'object') throw new Error(`JS: '${block.type}' type constant had ${typeof node.value} type value. Expected object.`);
+                return `(${Cast.toString(node.value)})`;
+            } else if (block.isAlwaysType(InputType.ARRAY)) {
+                if (!Array.isArray(node.value)) throw new Error(`JS: '${block.type}' type constant had ${typeof node.value} type value. Expected array.`);
+                return `(${Cast.toString(node.value)})`;
             } else if (block.isAlwaysType(InputType.COLOR)) {
                 if (!Array.isArray(node.value)) throw new Error(`JS: '${block.type}' type constant was not an array.`);
                 if (node.value.length !== 3) throw new Error(`JS: '${block.type}' type constant had an array of length '${node.value.length}'. Expected 3.`);
@@ -224,6 +341,17 @@ class JSGenerator {
             } else if (block.isSometimesType(InputType.STRING)) {
                 return `"${sanitize(node.value.toString())}"`;
             } throw new Error(`JS: Unknown constant input type '${block.type}'.`);
+
+        case InputOpcode.PEN_PAPER_EXISTS:
+            return `${PEN_EXT}._paperExists(${this.descendInput(node.paper)})`;
+        case InputOpcode.PEN_PAPERS:
+            return `${PEN_EXT}._paperMenu()`;
+        case InputOpcode.PEN_PAPER_INDEX:
+            return `${PEN_EXT}._paperIndex(${this.descendInput(node.paper)})`;
+        case InputOpcode.PEN_CURRENT_PAPER:
+            return `${PEN_EXT}._currentPaper`;
+        case InputOpcode.PEN_PAPER_VISIBLE:
+            return `${PEN_EXT}._paperIsVisible(${this.descendInput(node.paper)})`;
 
         case InputOpcode.SENSING_KEY_DOWN:
             return `runtime.ioDevices.keyboard.getKeyIsDown(${this.descendInput(node.key)})`;
@@ -247,6 +375,214 @@ class JSGenerator {
             return `listIndexOf(${this.referenceVariable(node.list)}, ${this.descendInput(node.item)})`;
         case InputOpcode.LIST_LENGTH:
             return `${this.referenceVariable(node.list)}.value.length`;
+        case InputOpcode.LIST_ASARRAY:
+            return `toArray(${this.referenceVariable(node.list)}.value)`;
+
+        case InputOpcode.TABLE_CELL_VALUE:
+            return `tableGetCell(${this.referenceVariable(node.table)}.value, ${this.descendInput(node.row)}, ${this.descendInput(node.column)})`;
+        case InputOpcode.TABLE_DIMENSION_VALUES:
+            return `tableGetDimension(${this.referenceVariable(node.table)}.value, "${sanitize(node.dimension)}", ${this.descendInput(node.index)})`;
+        case InputOpcode.TABLE_DIMENSION_LENGTH:
+            return `tableDimensionLength(${this.referenceVariable(node.table)}.value, "${sanitize(node.dimension)}", ${this.descendInput(node.index)})`;
+        case InputOpcode.TABLE_DIMENSION_COUNT:
+            return `tableDimensionCount(${this.referenceVariable(node.table)}.value, "${sanitize(node.dimension)}")`;
+        case InputOpcode.TABLE_CONTAINS_VALUE:
+            return `tableContains(${this.referenceVariable(node.table)}.value, ${this.descendInput(node.item)}, ${this.descendInput(node.row)}, ${this.descendInput(node.column)})`;
+        case InputOpcode.TABLE_AS_ARRAY:
+            return `tableAsArray(${this.referenceVariable(node.table)}.value)`;
+        case InputOpcode.TABLE_CONTENTS:
+            return `tableContents(${this.referenceVariable(node.table)}.value)`;
+
+        case InputOpcode.JSON_NEW_OBJECT:
+            return 'new Object()';
+        case InputOpcode.JSON_OBJECT: {
+            const entries = [];
+            for (let i = 0; i < node.count; i++) {
+                entries.push(
+                    `[${this.descendInput(node.keys[i])},${this.descendInput(node.values[i])}]`
+                );
+            }
+            return `Object.fromEntries([${entries.join(',')}])`;
+        }
+        case InputOpcode.JSON_GET_PROPERTIES: {
+            switch (node.property) {
+            case 'keys':
+                return `Object.keys(${this.descendInput(node.object)})`;
+            case 'values':
+                return `Object.values(${this.descendInput(node.object)})`;
+            case 'entries':
+                return `Object.entries(${this.descendInput(node.object)})`;
+            default:
+                return '[]';
+            }
+        }
+        case InputOpcode.JSON_VALUE_OF_KEY:
+            return `(${this.descendInput(node.object)}[${this.descendInput(node.key)}] ?? "")`;
+        case InputOpcode.JSON_SET_KEY: {
+            const i_ = this.localVariables.next();
+            return `((${i_} = Object.assign({}, ${this.descendInput(node.object)})), ${i_}[${this.descendInput(node.key)}] = ${this.descendInput(node.value)}, ${i_})`;
+        }
+        case InputOpcode.JSON_DELETE_KEY: {
+            const i_ = this.localVariables.next();
+            return `((${i_} = Object.assign({}, ${this.descendInput(node.object)})), delete ${i_}[${this.descendInput(node.key)}], ${i_})`;
+        }
+        case InputOpcode.JSON_MERGE_OBJECT: {
+            /** @type {IntermediateInput[]} */
+            const items = node.items;
+            return `mergeObjects(${items.map(i => this.descendInput(i)).join(', ')})`;
+        }
+        case InputOpcode.JSON_HAS_KEY:
+            return `${this.descendInput(node.object)}.hasOwnProperty(${this.descendInput(node.key)})`;
+        case InputOpcode.JSON_NEW_ARRAY:
+            return '[]';
+        case InputOpcode.JSON_ARRAY: {
+            /** @type {IntermediateInput[]} */
+            const items = node.items;
+            return `[${items.map(item => this.descendInput(item)).join(',')}]`;
+        }
+        case InputOpcode.JSON_VALUE_OF_INDEX:
+            return `arrayValueOfIndex(${this.descendInput(node.array)}, ${this.descendInput(node.index)})`;
+        case InputOpcode.JSON_INDEX_OF_VALUE:
+            return `arrayIndexOf(${this.descendInput(node.array)}, ${this.descendInput(node.value)})`;
+        case InputOpcode.JSON_ADD_ITEM: {
+            /** @type {IntermediateInput[]} */
+            const items = node.items;
+            const i_ = this.localVariables.next();
+            return `((${i_} = ${this.descendInput(node.array)}.slice(0)), ${i_}.push(...[${items.map(i => this.descendInput(i)).join(', ')}]), ${i_})`;
+        }
+        case InputOpcode.JSON_REPLACE_INDEX:
+            return `arrayReplaceAtIndex(${this.descendInput(node.array)}, ${this.descendInput(node.index)}, ${this.descendInput(node.item)})`;
+        case InputOpcode.JSON_DELETE_INDEX:
+            return `arrayDeleteAtIndex(${this.descendInput(node.array)}, ${this.descendInput(node.index)})`;
+        case InputOpcode.JSON_DELETE_ALL_OCCURRENCES: {
+            const i_ = this.localVariables.next();
+            return `${this.descendInput(node.array)}.filter(${i_} => ${i_} !== ${this.descendInput(node.item)})`;
+        }
+        case InputOpcode.JSON_MERGE_ARRAY: {
+            /** @type {IntermediateInput[]} */
+            const items = node.items;
+            return `mergeArrays(${items.map(i => this.descendInput(i)).join(', ')})`;
+        }
+        case InputOpcode.JSON_HAS_ITEM:
+            return `${this.descendInput(node.array)}.includes(${this.descendInput(node.item)})`;
+        case InputOpcode.JSON_ARRAY_LENGTH:
+            return `${this.descendInput(node.array)}.length`;
+        case InputOpcode.JSON_SLICE_ARRAY:
+            return `sliceArray(${this.descendInput(node.array)}, ${this.descendInput(node.start)}, ${this.descendInput(node.end)})`;
+        case InputOpcode.JSON_REVERSE_ARRAY:
+            return `${this.descendInput(node.array)}.slice(0).reverse()`;
+        case InputOpcode.JSON_SPLIT:
+            return `${this.descendInput(node.input)}.${node.mode === 'join' ? 'join' : 'split'}(${this.descendInput(node.delimiter)})`;
+        case InputOpcode.JSON_FOREACH_VALUE: {
+            const vars = this.foreachVarsStack?.[this.foreachVarsStack.length - 1];
+            return vars?.value ?? '""';
+        }
+        case InputOpcode.JSON_FOREACH_INDEX: {
+            const vars = this.foreachVarsStack?.[this.foreachVarsStack.length - 1];
+            return vars?.index ?? '0';
+        }
+        case InputOpcode.JSON_MAP: {
+            this.yielded();
+            const array = this.descendInput(node.array);
+            const value = this.localVariables.next();
+            const index = this.localVariables.next();
+            if (!this.mapVarsStack) this.mapVarsStack = [];
+            this.mapVarsStack.push({value, index});
+            const mapper = this.descendInput(node.mapper);
+            this.mapVarsStack.pop();
+            return [
+                `(yield* (function* () {`,
+                `const arr = toArray(${array});`,
+                `const res = [];`,
+                `for (const [${index}, ${value}] of arr.entries()) {`,
+                `res.push(yield* (function* () { return ${mapper}; })());`,
+                `}`,
+                `return res;`,
+                `})())`
+            ].join('\n');
+        }
+        case InputOpcode.JSON_MAP_VALUE: {
+            const vars = this.mapVarsStack?.[this.mapVarsStack.length - 1];
+            return vars?.value ?? '""';
+        }
+        case InputOpcode.JSON_MAP_INDEX: {
+            const vars = this.mapVarsStack?.[this.mapVarsStack.length - 1];
+            return vars?.index ?? '""';
+        }
+        case InputOpcode.JSON_FILTER: {
+            this.yielded();
+            const array = this.descendInput(node.array);
+            const value = this.localVariables.next();
+            const index = this.localVariables.next();
+            if (!this.filterVarsStack) this.filterVarsStack = [];
+            this.filterVarsStack.push({value, index});
+            const mapper = this.descendInput(node.mapper);
+            this.filterVarsStack.pop();
+            return [
+                `(yield* (function* () {`,
+                `const arr = toArray(${array});`,
+                `const res = [];`,
+                `for (const [${index}, ${value}] of arr.entries()) {`,
+                `if (yield* (function* () { return ${mapper}; })()) {`,
+                `res.push(${value});`,
+                `}`,
+                `}`,
+                `return res;`,
+                `})())`
+            ].join('\n');
+        }
+        case InputOpcode.JSON_FILTER_VALUE: {
+            const vars = this.filterVarsStack?.[this.filterVarsStack.length - 1];
+            return vars?.value ?? '""';
+        }
+        case InputOpcode.JSON_FILTER_INDEX: {
+            const vars = this.filterVarsStack?.[this.filterVarsStack.length - 1];
+            return vars?.index ?? '""';
+        }
+        case InputOpcode.JSON_SORT: {
+            this.yielded();
+            const array = this.descendInput(node.array);
+            const a = this.localVariables.next();
+            const b = this.localVariables.next();
+            if (!this.sortVarsStack) this.sortVarsStack = [];
+            this.sortVarsStack.push({a, b});
+            const mapper = this.descendInput(node.mapper);
+            this.sortVarsStack.pop();
+            return [
+                `(yield* (function* () {`,
+                `let ${a};`,
+                `let ${b};`,
+                `let res = toArray(${array});`,
+                `for (let width = 1; width < res.length; width *= 2) {`,
+                `const merged = [];`,
+                `for (let start = 0; start < res.length; start += width * 2) {`,
+                `const middle = Math.min(start + width, res.length);`,
+                `const end = Math.min(start + width * 2, res.length);`,
+                `let left = start;`,
+                `let right = middle;`,
+                `while (left < middle && right < end) {`,
+                `${a} = res[left];`,
+                `${b} = res[right];`,
+                `const comparison = yield* (function* () { return ${mapper}; })();`,
+                `if (comparison <= 0) merged.push(res[left++]);`,
+                `else merged.push(res[right++]);`,
+                `}`,
+                `merged.push(...res.slice(left, middle), ...res.slice(right, end));`,
+                `}`,
+                `res = merged;`,
+                `}`,
+                `return res;`,
+                `})())`
+            ].join('\n');
+        }
+        case InputOpcode.JSON_SORT_A: {
+            const vars = this.sortVarsStack?.[this.sortVarsStack.length - 1];
+            return vars?.a ?? '""';
+        }
+        case InputOpcode.JSON_SORT_B: {
+            const vars = this.sortVarsStack?.[this.sortVarsStack.length - 1];
+            return vars?.b ?? '""';
+        }
 
         case InputOpcode.LOOKS_SIZE_GET:
             return 'Math.round(target.size)';
@@ -269,9 +605,9 @@ class JSGenerator {
         case InputOpcode.SENSING_MOUSE_DOWN:
             return 'runtime.ioDevices.mouse.getIsDown()';
         case InputOpcode.SENSING_MOUSE_X:
-            return 'runtime.ioDevices.mouse.getScratchX()';
+            return 'runtime.ioDevices.mouse.getScratchX(target)';
         case InputOpcode.SENSING_MOUSE_Y:
-            return 'runtime.ioDevices.mouse.getScratchY()';
+            return 'runtime.ioDevices.mouse.getScratchY(target)';
 
         case InputOpcode.OP_ABS:
             return `Math.abs(${this.descendInput(node.value)})`;
@@ -358,6 +694,8 @@ class JSGenerator {
         }
         case InputOpcode.OP_LETTER_OF:
             return `((${this.descendInput(node.string)})[${this.descendInput(node.letter)} - 1] || "")`;
+        case InputOpcode.OP_LETTERS_IN:
+            return `lettersIn(${this.descendInput(node.string)}, ${this.descendInput(node.start)}, ${this.descendInput(node.end)})`;
         case InputOpcode.OP_LOG_E:
             return `Math.log(${this.descendInput(node.value)})`;
         case InputOpcode.OP_LOG_10:
@@ -391,6 +729,109 @@ class JSGenerator {
             return `tan(${this.descendInput(node.value)})`;
         case InputOpcode.OP_POW_10:
             return `(10 ** ${this.descendInput(node.value)})`;
+        case InputOpcode.OP_TYPEOF: {
+            const value = this.descendInput(node.target);
+            return `(Array.isArray(${value}) ? "array" : typeof ${value})`;
+        }
+        case InputOpcode.OP_ADD_EXTENDABLE: {
+            if (node.count === 0) return '0';
+            /** @type {IntermediateInput[]} */
+            const operands = node.operands;
+            return `(${operands.map(o => this.descendInput(o)).join(' + ')})`;
+        }
+        case InputOpcode.OP_SUBTRACT_EXTENDABLE: {
+            if (node.count === 0) return '0';
+            /** @type {IntermediateInput[]} */
+            const operands = node.operands;
+            return `(${operands.map(o => this.descendInput(o)).join(' - ')})`;
+        }
+        case InputOpcode.OP_MULTIPLY_EXTENDABLE: {
+            if (node.count === 0) return '0';
+            /** @type {IntermediateInput[]} */
+            const operands = node.operands;
+            return `(${operands.map(o => this.descendInput(o)).join(' * ')})`;
+        }
+        case InputOpcode.OP_DIVIDE_EXTENDABLE: {
+            if (node.count === 0) return '0';
+            /** @type {IntermediateInput[]} */
+            const operands = node.operands;
+            return `(${operands.map(o => this.descendInput(o)).join(' / ')})`;
+        }
+        case InputOpcode.OP_POWER: {
+            if (node.count === 0) return '0';
+            /** @type {IntermediateInput[]} */
+            const operands = node.operands;
+            return `(${operands.map(o => this.descendInput(o)).join(' ** ')})`;
+        }
+        case InputOpcode.OP_AND_EXTENDABLE: {
+            if (node.count === 0) return 'true';
+            /** @type {IntermediateInput[]} */
+            const operands = node.operands;
+            return `(${operands.map(o => this.descendInput(o)).join(' && ')})`;
+        }
+        case InputOpcode.OP_OR_EXTENDABLE: {
+            if (node.count === 0) return 'false';
+            /** @type {IntermediateInput[]} */
+            const operands = node.operands;
+            return `(${operands.map(o => this.descendInput(o)).join(' || ')})`;
+        }
+        case InputOpcode.OP_XOR_EXTENDABLE: {
+            if (node.count === 0) return 'false';
+            /** @type {IntermediateInput[]} */
+            const operands = node.operands;
+            return `(${operands.map(o => this.descendInput(o)).join(' !== ')})`;
+        }
+        case InputOpcode.OP_JOIN_EXTENDABLE: {
+            if (node.count === 0) return '""';
+            /** @type {IntermediateInput[]} */
+            const operands = node.operands;
+            return `(${operands.map(o => this.descendInput(o)).join(' + ')})`;
+        }
+        case InputOpcode.OP_LESS_EXTENDABLE: {
+            if (node.count <= 1) return 'true';
+            /** @type {IntermediateInput[]} */
+            const operands = node.operands;
+            return `(${operands.slice(0, -1).map((_, i) =>
+                `compareLessThan(${this.descendInput(node.operands[i])}, ${this.descendInput(node.operands[i + 1])})`
+            )
+                .join(' && ')})`;
+        }
+        case InputOpcode.OP_EQUALS_EXTENDABLE: {
+            if (node.count <= 1) return 'true';
+            /** @type {IntermediateInput[]} */
+            const operands = node.operands;
+            return `(${operands.slice(0, -1).map((_, i) =>
+                `compareEqual(${this.descendInput(node.operands[i])}, ${this.descendInput(node.operands[i + 1])})`
+            )
+                .join(' && ')})`;
+        }
+        case InputOpcode.OP_GREATER_EXTENDABLE: {
+            if (node.count <= 1) return 'true';
+            /** @type {IntermediateInput[]} */
+            const operands = node.operands;
+            return `(${operands.slice(0, -1).map((_, i) =>
+                `compareGreaterThan(${this.descendInput(node.operands[i])}, ${this.descendInput(node.operands[i + 1])})`
+            )
+                .join(' && ')})`;
+        }
+        case InputOpcode.OP_LESS_OR_EQUAL_EXTENDABLE: {
+            if (node.count <= 1) return 'true';
+            /** @type {IntermediateInput[]} */
+            const operands = node.operands;
+            return `(${operands.slice(0, -1).map((_, i) =>
+                `!compareGreaterThan(${this.descendInput(node.operands[i])}, ${this.descendInput(node.operands[i + 1])})`
+            )
+                .join(' && ')})`;
+        }
+        case InputOpcode.OP_GREATER_OR_EQUAL_EXTENDABLE: {
+            if (node.count <= 1) return 'true';
+            /** @type {IntermediateInput[]} */
+            const operands = node.operands;
+            return `(${operands.slice(0, -1).map((_, i) =>
+                `!compareLessThan(${this.descendInput(node.operands[i])}, ${this.descendInput(node.operands[i + 1])})`
+            )
+                .join(' && ')})`;
+        }
 
         case InputOpcode.PROCEDURE_CALL: {
             const procedureCode = node.code;
@@ -408,7 +849,22 @@ class JSGenerator {
             const procedureReference = `thread.procedures["${sanitize(procedureVariant)}"]`;
             const args = [];
             for (const input of node.arguments) {
-                args.push(this.descendInput(input));
+                if (input instanceof IntermediateStack) {
+                    const oldSource = this.source;
+                    this.source = 'function*(thread, target, runtime, stage) {\n';
+                    const oldWarp = this.isWarp;
+                    this.isWarp = procedureData.isWarp;
+                    const oldReturns = this.allowReturns;
+                    this.allowReturns = true;
+                    this.descendStack(input, new Frame(false));
+                    this.source += `}`;
+                    args.push(this.source);
+                    this.allowReturns = oldReturns;
+                    this.isWarp = oldWarp;
+                    this.source = oldSource;
+                } else {
+                    args.push(this.descendInput(input));
+                }
             }
             const joinedArgs = args.join(',');
 
@@ -475,6 +931,10 @@ class JSGenerator {
             return `(${varRef} ? ${varRef}.value : 0)`;
         } case InputOpcode.SENSING_TIME_SECOND:
             return `(new Date().getSeconds())`;
+        case InputOpcode.SENSING_TIME_MILLISECOND:
+            return `(new Date().getMilliseconds())`;
+        case InputOpcode.SENSING_TIME_TIMESTAMP:
+            return `(new Date().getTime())`;
         case InputOpcode.SENSING_TOUCHING_OBJECT:
             return `target.isTouchingObject(${this.descendInput(node.object)})`;
         case InputOpcode.SENSING_TOUCHING_COLOR:
@@ -483,12 +943,35 @@ class JSGenerator {
             return 'runtime.ioDevices.userData.getUsername()';
         case InputOpcode.SENSING_TIME_YEAR:
             return `(new Date().getFullYear())`;
-
         case InputOpcode.SENSING_TIMER_GET:
             return 'runtime.ioDevices.clock.projectTimer()';
+        case InputOpcode.SENSING_LOUDNESS:
+            return 'runtime.ext_scratch3_sensing.getLoudness()';
+        case InputOpcode.SENSING_LOUD:
+            return '(runtime.ext_scratch3_sensing.getLoudness() > 10)';
+        case InputOpcode.SENSING_ONLINE: {
+            // Read: sensing_online implementation in scratch3_sensing.js
+            if (typeof navigator?.onLine === 'boolean') {
+                return `navigator.onLine`;
+            }
+            return 'true';
+        }
 
+        case InputOpcode.SOUND_VOLUME:
+            return 'target.volume';
+
+        case InputOpcode.CONTROL_INLINE_IF_ELSE: {
+            const operand = this.descendInput(node.operand);
+            const _then = this.descendInput(node.then);
+            const _else = this.descendInput(node.else);
+            return `(${operand} ? ${_then} : ${_else})`;
+        }
         case InputOpcode.CONTROL_COUNTER:
             return 'runtime.ext_scratch3_control._counter';
+        case InputOpcode.CONTROL_FOREACH_IN_RANGE_ITEM: {
+            const vars = this.forEachInRangeStack?.[this.forEachInRangeStack.length - 1];
+            return vars ?? '0';
+        }
 
         case InputOpcode.TW_KEY_LAST_PRESSED:
             return 'runtime.ioDevices.keyboard.getLastKeyPressed()';
@@ -506,6 +989,7 @@ class JSGenerator {
      * @param {IntermediateStackBlock} block Stacked block to compile.
      */
     descendStackedBlock (block) {
+        /** @type {Record<string, any>} */
         const node = block.inputs;
         switch (block.opcode) {
         case StackOpcode.ADDON_CALL: {
@@ -521,7 +1005,8 @@ class JSGenerator {
             const blockType = node.blockType;
             if (blockType === BlockType.COMMAND || blockType === BlockType.HAT) {
                 this.source += `${this.generateCompatibilityLayerCall(node, isLastInLoop)};\n`;
-            } else if (blockType === BlockType.CONDITIONAL || blockType === BlockType.LOOP) {
+            } else if (blockType === BlockType.CONDITIONAL || blockType === BlockType.LOOP ||
+                blockType === BlockType.REPORTER || blockType === BlockType.OBJECT || blockType === BlockType.ARRAY) {
                 const branchVariable = this.localVariables.next();
                 this.source += `const ${branchVariable} = createBranchInfo(${blockType === BlockType.LOOP});\n`;
                 this.source += `while (${branchVariable}.branch = +(${this.generateCompatibilityLayerCall(node, false, branchVariable)})) {\n`;
@@ -548,6 +1033,19 @@ class JSGenerator {
 
         case InputOpcode.OLD_COMPILER_COMPATIBILITY_LAYER:
             return this.oldCompilerStub.descendStackedBlockFromNewCompiler(block);
+
+        case StackOpcode.EXT_COMPILED_BLOCK: {
+            const compileCall = node.func;
+
+            const args = Object.fromEntries(
+                Object.entries({...node.inputs, ...node.fields})
+                    .map(([name, input]) => [name, this.descendInput(input)])
+            );
+            const util = this.makeCompilerUtil(node);
+
+            this.source += compileCall(args, util) || '';
+            break;
+        }
 
         case StackOpcode.HAT_EDGE:
             this.isInHat = true;
@@ -665,6 +1163,71 @@ class JSGenerator {
         case StackOpcode.CONTORL_INCR_COUNTER:
             this.source += 'runtime.ext_scratch3_control._counter++;\n';
             break;
+        case StackOpcode.CONTROL_FOREACH_IN_RANGE: {
+            const from = this.descendInput(node.from);
+            const to = this.descendInput(node.to);
+            const loopVar = this.localVariables.next();
+            const fromVar = this.localVariables.next();
+            const toVar = this.localVariables.next();
+            const stepVar = this.localVariables.next();
+
+            if (!this.forEachInRangeStack) this.forEachInRangeStack = [];
+            this.forEachInRangeStack.push(loopVar);
+
+            this.source += `const ${fromVar} = Math.round(${from});\n`;
+            this.source += `const ${toVar} = Math.round(${to});\n`;
+            this.source += `const ${stepVar} = ${fromVar} <= ${toVar} ? 1 : -1;\n`;
+            this.source += `for (let ${loopVar} = ${fromVar}; ${fromVar} <= ${toVar} ? ${loopVar} <= ${toVar} : ${loopVar} >= ${toVar}; ${loopVar} += ${stepVar}) {\n`;
+
+            if (node.do) this.descendStack(node.do, new Frame(true));
+            this.yieldLoop();
+            this.source += `}\n`;
+
+            this.forEachInRangeStack.pop();
+            break;
+        }
+        case StackOpcode.CONTROL_IF_EXTENDABLE: {
+            for (let i = 0; i < node.count; i++) {
+                const branch = node.branches[i];
+                if (i === 0) {
+                    this.source += `if (${this.descendInput(branch.condition)}) {\n`;
+                } else {
+                    this.source += `} else if (${this.descendInput(branch.condition)}) {\n`;
+                }
+                this.descendStack(branch.do, new Frame(false));
+            }
+            if (node.count > 0) this.source += '}\n';
+            break;
+        }
+        case StackOpcode.CONTROL_IF_ELSE_EXTENDABLE: {
+            for (let i = 0; i < node.count; i++) {
+                const branch = node.branches[i];
+                if (i === 0) {
+                    this.source += `if (${this.descendInput(branch.condition)}) {\n`;
+                } else {
+                    this.source += `} else if (${this.descendInput(branch.condition)}) {\n`;
+                }
+                this.descendStack(branch.do, new Frame(false));
+            }
+            if (node.count > 0) this.source += '}\n';
+            this.source += `else {\n`;
+            this.descendStack(node.elseBranch, new Frame(false));
+            this.source += '}\n';
+            break;
+        }
+        case StackOpcode.CONTROL_SWITCH: {
+            this.source += `switch (${this.descendInput(node.switch)}) {\n`;
+            for (let i = 0; i < node.count; i++) {
+                const caseNode = node.cases[i];
+                this.source += `case (${this.descendInput(caseNode.value)}): {\n`;
+                this.descendStack(caseNode.do, new Frame(false));
+                this.source += `break;}\n`;
+            }
+            this.source += `default: {\n`;
+            this.descendStack(node.defaultBranch, new Frame(false));
+            this.source += `}\n}\n`;
+            break;
+        }
 
         case StackOpcode.EVENT_BROADCAST:
             this.source += `startHats("event_whenbroadcastreceived", { BROADCAST_OPTION: ${this.descendInput(node.broadcast)} });\n`;
@@ -672,6 +1235,64 @@ class JSGenerator {
         case StackOpcode.EVENT_BROADCAST_AND_WAIT:
             this.source += `yield* waitThreads(startHats("event_whenbroadcastreceived", { BROADCAST_OPTION: ${this.descendInput(node.broadcast)} }));\n`;
             this.yielded();
+            break;
+
+        case StackOpcode.TABLE_ADD: {
+            const table = this.referenceVariable(node.table);
+            const dimension = node.dimension;
+            if (dimension === 'column') {
+                this.source += `tableAddColumn(${table});\n`;
+            } else {
+                this.source += `tableAddRow(${table});\n`;
+            }
+            break;
+        }
+        case StackOpcode.TABLE_INSERT: {
+            const table = this.referenceVariable(node.table);
+            const dimension = node.dimension;
+            const index = this.descendInput(node.index);
+            if (dimension === 'column') {
+                this.source += `tableInsertColumn(${table}, ${index});\n`;
+            } else {
+                this.source += `tableInsertRow(${table}, ${index});\n`;
+            }
+            break;
+        }
+        case StackOpcode.TABLE_SET_CELL: {
+            const table = this.referenceVariable(node.table);
+            this.source += `tableSetCell(${table}, ${this.descendInput(node.row)}, ${this.descendInput(node.COLUMN)}, ${this.descendInput(node.item)});\n`;
+            break;
+        }
+        case StackOpcode.TABLE_DELETE_CELL: {
+            const table = this.referenceVariable(node.table);
+            this.source += `tableDeleteCell(${table}, ${this.descendInput(node.row)}, ${this.descendInput(node.COLUMN)});\n`;
+            break;
+        }
+        case StackOpcode.TABLE_DELETE: {
+            const table = this.referenceVariable(node.table);
+            const dimension = node.dimension;
+            const index = this.descendInput(node.index);
+            if (dimension === 'column') {
+                this.source += `tableDeleteColumn(${table}, ${index});\n`;
+            } else {
+                this.source += `tableDeleteRow(${table}, ${index});\n`;
+            }
+            break;
+        }
+        case StackOpcode.TABLE_DELETE_ALL:
+            this.source += `${this.referenceVariable(node.table)}.value = [];\n`;
+            this.source += `${this.referenceVariable(node.table)}._monitorUpToDate = false;\n`;
+            break;
+        case StackOpcode.TABLE_SET: {
+            const table = this.referenceVariable(node.table);
+            this.source += `tableSet(${table}, ${this.descendInput(node.arr)});\n`;
+            break;
+        }
+        case StackOpcode.TABLE_SHOW:
+            this.source += `runtime.monitorBlocks.changeBlock({ id: "${sanitize(node.table.id)}", element: "checkbox", value: true }, runtime);\n`;
+            break;
+        case StackOpcode.TABLE_HIDE:
+            this.source += `runtime.monitorBlocks.changeBlock({ id: "${sanitize(node.table.id)}", element: "checkbox", value: false }, runtime);\n`;
             break;
 
         case StackOpcode.LIST_ADD: {
@@ -719,6 +1340,29 @@ class JSGenerator {
         case StackOpcode.LIST_SHOW:
             this.source += `runtime.monitorBlocks.changeBlock({ id: "${sanitize(node.list.id)}", element: "checkbox", value: true }, runtime);\n`;
             break;
+        case StackOpcode.LIST_SETLISTARRAY: {
+            const list = this.referenceVariable(node.list);
+            const item = this.descendInput(node.array);
+            this.source += `${list}.value = toArray(${item});`;
+            break;
+        }
+
+        case StackOpcode.JSON_FOREACH: {
+            const array = this.descendInput(node.array);
+            const valVar = this.localVariables.next();
+            const indVar = this.localVariables.next();
+
+            if (!this.foreachVarsStack) this.foreachVarsStack = [];
+            this.foreachVarsStack.push({value: valVar, index: indVar});
+
+            this.source += `for (const [${indVar}, ${valVar}] of toArray(${array}).entries()) {\n`;
+            if (node.substack) this.descendStack(node.substack, new Frame(true));
+            this.yieldLoop();
+            this.source += `}\n`;
+
+            this.foreachVarsStack.pop();
+            break;
+        }
 
         case StackOpcode.LOOKS_LAYER_BACKWARD:
             if (!this.target.isStage) {
@@ -823,6 +1467,9 @@ class JSGenerator {
         case StackOpcode.PEN_CLEAR:
             this.source += `${PEN_EXT}.clear();\n`;
             break;
+        case StackOpcode.PEN_PAPER_CLEAR:
+            this.source += `${PEN_EXT}._clearPaper(${this.descendInput(node.paper)});\n`;
+            break;
         case StackOpcode.PEN_DOWN:
             this.source += `${PEN_EXT}._penDown(target);\n`;
             break;
@@ -856,6 +1503,58 @@ class JSGenerator {
         case StackOpcode.PEN_STAMP:
             this.source += `${PEN_EXT}._stamp(target);\n`;
             break;
+        case StackOpcode.PEN_PRINT:
+            this.source += `yield* waitPromise(${PEN_EXT}._printText(` +
+                `${this.descendInput(node.text)}, ${this.descendInput(node.x)}, ` +
+                `${this.descendInput(node.y)}, target));\n`;
+            this.yielded();
+            break;
+        case StackOpcode.PEN_PRINT_FONT_SET:
+            this.source += `${PEN_EXT}._setPrintFont(${this.descendInput(node.font)}, target);\n`;
+            break;
+        case StackOpcode.PEN_PRINT_FONT_SIZE_SET:
+            this.source += `${PEN_EXT}._setPrintFontSize(${this.descendInput(node.size)}, target);\n`;
+            break;
+        case StackOpcode.PEN_PRINT_COLOR_SET:
+            this.source += `${PEN_EXT}._setPrintColor(${this.descendInput(node.target)}, ` +
+                `${this.descendInput(node.color)}, target);\n`;
+            break;
+        case StackOpcode.PEN_PRINT_STROKE_WIDTH_SET:
+            this.source += `${PEN_EXT}._setPrintStrokeWidth(${this.descendInput(node.width)}, target);\n`;
+            break;
+        case StackOpcode.PEN_PRINT_FONT_WEIGHT_SET:
+            this.source += `${PEN_EXT}._setPrintFontWeight(${this.descendInput(node.weight)}, target);\n`;
+            break;
+        case StackOpcode.PEN_PRINT_ITALIC_SET:
+            this.source += `${PEN_EXT}._setPrintItalic(${this.descendInput(node.state)}, target);\n`;
+            break;
+        case StackOpcode.PEN_PRINT_WORD_WRAP_SET:
+            this.source += `${PEN_EXT}._setPrintWordWrap(${this.descendInput(node.state)}, target);\n`;
+            break;
+        case StackOpcode.PEN_PRINT_ALIGNMENT_SET:
+            this.source += `${PEN_EXT}._setPrintAlignment(${this.descendInput(node.alignment)}, target);\n`;
+            break;
+        case StackOpcode.PEN_PAPER_CREATE:
+            this.source += `${PEN_EXT}._createPaper(${this.descendInput(node.paper)});\n`;
+            break;
+        case StackOpcode.PEN_PAPER_REMOVE:
+            this.source += `${PEN_EXT}._removePaper(${this.descendInput(node.paper)});\n`;
+            break;
+        case StackOpcode.PEN_PAPER_COMBINE:
+            this.source += `${PEN_EXT}._combinePapers(${this.descendInput(node.mode)}, ` +
+                `${this.descendInput(node.source)}, ${this.descendInput(node.destination)});\n`;
+            break;
+        case StackOpcode.PEN_PAPER_INDEX_SET:
+            this.source += `${PEN_EXT}._setPaperIndex(${this.descendInput(node.paper)}, ` +
+                `${this.descendInput(node.index)});\n`;
+            break;
+        case StackOpcode.PEN_PAPER_SWITCH:
+            this.source += `${PEN_EXT}._switchPaper(${this.descendInput(node.paper)});\n`;
+            break;
+        case StackOpcode.PEN_PAPER_VISIBILITY_SET:
+            this.source += `${PEN_EXT}._setPaperVisibility(${this.descendInput(node.visibility)}, ` +
+                `${this.descendInput(node.paper)});\n`;
+            break;
         case StackOpcode.PEN_UP:
             this.source += `${PEN_EXT}._penUp(target);\n`;
             break;
@@ -873,6 +1572,8 @@ class JSGenerator {
                 // Direct yields.
                 this.yieldNotWarp();
             }
+            const outputVariable = this.localVariables.next();
+            this.source += `let ${outputVariable} = `;
             if (procedureData.yields) {
                 this.source += 'yield* ';
                 if (!this.script.yields) {
@@ -882,18 +1583,53 @@ class JSGenerator {
             this.source += `thread.procedures["${sanitize(procedureVariant)}"](`;
             const args = [];
             for (const input of node.arguments) {
-                args.push(this.descendInput(input));
+                if (input instanceof IntermediateStack) {
+                    const oldSource = this.source;
+                    this.source = 'function*(thread, target, runtime, stage) {\n';
+                    const oldWarp = this.isWarp;
+                    this.isWarp = procedureData.isWarp;
+                    const oldReturns = this.allowReturns;
+                    this.allowReturns = true;
+                    this.descendStack(input, new Frame(false));
+                    this.source += `}`;
+                    args.push(this.source);
+                    this.allowReturns = oldReturns;
+                    this.isWarp = oldWarp;
+                    this.source = oldSource;
+                } else {
+                    args.push(this.descendInput(input));
+                }
             }
             this.source += args.join(',');
             this.source += `);\n`;
             break;
         }
+        case StackOpcode.PROCEDURE_SET_PARAM: {
+            const value = this.descendInput(node.value);
+            const i = node.param.inputs.index;
+            this.source += `p${i} = ${value};\n`;
+            break;
+        }
+
         case StackOpcode.PROCEDURE_RETURN:
             this.stopScriptAndReturn(this.descendInput(node.value));
+            break;
+        case StackOpcode.PROCEDURE_BRANCH:
+            if (node.index !== -1) {
+                const outputVariable = this.localVariables.next();
+                this.source += `let ${outputVariable} = yield* (p${node.index} || function*(){})(thread, target, runtime, stage);\n`;
+                this.source += `if (${outputVariable} !== undefined) {\n`;
+                this.stopScriptAndReturn(outputVariable);
+                this.source += '};\n';
+            }
             break;
 
         case StackOpcode.SENSING_TIMER_RESET:
             this.source += 'runtime.ioDevices.clock.resetProjectTimer();\n';
+            break;
+        case StackOpcode.SENSING_SET_DRAG_MODE:
+            console.log(node);
+            this.source += `target.setDraggable(${node.draggable});\n`;
             break;
 
         case StackOpcode.DEBUGGER:
@@ -966,14 +1702,37 @@ class JSGenerator {
         // TODO: allow if/else to inherit values
         this.pushFrame(frame);
 
-        for (let i = 0; i < stack.blocks.length; i++) {
-            frame.isLastBlock = i === stack.blocks.length - 1;
-            this.descendStackedBlock(stack.blocks[i]);
+        try {
+            for (let i = 0; i < stack.blocks.length; i++) {
+                frame.isLastBlock = i === stack.blocks.length - 1;
+                this.descendStackedBlock(stack.blocks[i]);
+            }
+        } finally {
+            // Leaving a stack -- any assumptions made in the current stack do not apply outside of it
+            // TODO: in if/else this might create an extra unused object
+            this.popFrame();
+        }
+    }
+
+    /**
+     * Compile a stack into a standalone source fragment.
+     * @param {IntermediateStack} stack
+     * @param {boolean} isLoop
+     * @returns {string}
+     */
+    compileStackToSource (stack, isLoop) {
+        if (!stack) {
+            return '';
         }
 
-        // Leaving a stack -- any assumptions made in the current stack do not apply outside of it
-        // TODO: in if/else this might create an extra unused object
-        this.popFrame();
+        const outerSource = this.source;
+        this.source = '';
+        try {
+            this.descendStack(stack, new Frame(isLoop));
+            return this.source;
+        } finally {
+            this.source = outerSource;
+        }
     }
 
     /**
@@ -1099,6 +1858,7 @@ class JSGenerator {
         return factoryNameVariablePool.next();
     }
 
+    /** @param {boolean} yields */
     getScriptName (yields) {
         let name = yields ? generatorNameVariablePool.next() : functionNameVariablePool.next();
         if (this.isProcedure) {
@@ -1123,7 +1883,7 @@ class JSGenerator {
      * @param {string} valueJS JS code of value to return.
      */
     stopScriptAndReturn (valueJS) {
-        if (this.isProcedure) {
+        if (this.isProcedure || this.allowReturns) {
             this.source += `return ${valueJS};\n`;
         } else {
             this.retire();
@@ -1164,9 +1924,15 @@ class JSGenerator {
             script += args.join(',');
         }
         script += ') {\n';
+        script += 'try {\n';
 
         script += this.source;
 
+        script += '} catch (error) {\n';
+        script += 'console.warn(this.toString(), error);\n';
+        script += `runtime.visualReport(target, "${sanitize(this.script.bottomBlockId)}", String(error), true);\n`;
+        script += 'retire();\n';
+        script += '};\n';
         script += '}; })';
 
         return script;
@@ -1210,6 +1976,7 @@ JSGenerator.unstable_exports = {
 };
 
 // Test hook used by automated snapshot testing.
+// @ts-ignore
 JSGenerator.testingApparatus = null;
 
 module.exports = JSGenerator;

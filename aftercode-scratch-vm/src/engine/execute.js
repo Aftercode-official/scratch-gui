@@ -3,6 +3,7 @@ const BlocksExecuteCache = require('./blocks-execute-cache');
 const log = require('../util/log');
 const Thread = require('./thread');
 const cast = require('../util/cast');
+const Timer = require('../util/timer');
 
 /**
  * Single BlockUtility instance reused by execute for every pritimive ran.
@@ -15,6 +16,21 @@ const blockUtility = new BlockUtility();
  * @const {string}
  */
 const blockFunctionProfilerFrame = 'blockFunction';
+
+// Inputs in this table are evaluated by their primitive instead of as part of
+// execute's normal, flattened input list. This supports higher-order reporters
+// which need to evaluate an input more than once.
+const deferredInputs = {
+    json_map: new Set(['METHOD']),
+    json_filter: new Set(['METHOD']),
+    json_sort: new Set(['METHOD'])
+};
+
+const inheritedReporterContextProperties = [
+    'jsonMapContexts',
+    'jsonFilterContexts',
+    'jsonSortContexts'
+];
 
 /**
  * Profiler frame ID for 'blockFunction'.
@@ -126,7 +142,7 @@ const handlePromiseResolution = (resolvedValue, sequencer, thread, blockCached, 
             if (popped === null) {
                 return;
             }
-            nextBlockId = thread.target.blocks.getNextBlock(popped);
+            nextBlockId = thread.blockContainer.getNextBlock(popped);
             if (nextBlockId !== null) {
                 // A next block exists so break out this loop
                 break;
@@ -315,11 +331,13 @@ class BlockCached {
             if (
                 fieldName === 'VARIABLE' ||
                 fieldName === 'LIST' ||
+                fieldName === 'TABLE' ||
                 fieldName === 'BROADCAST_OPTION'
             ) {
+                const fieldValue = fields[fieldName].value;
                 this._argValues[fieldName] = {
-                    id: fields[fieldName].id,
-                    name: fields[fieldName].value
+                    id: fields[fieldName].id || null,
+                    name: (typeof fieldValue === 'undefined' || fieldValue === null) ? '' : fieldValue
                 };
             } else {
                 this._argValues[fieldName] = fields[fieldName].value;
@@ -358,7 +376,9 @@ class BlockCached {
         // operations can later be run in the order they appear in correctly
         // executing the operations quickly in a flat loop instead of needing to
         // recursivly iterate them.
+        const deferred = deferredInputs[opcode];
         for (const inputName in this._inputs) {
+            if (deferred && deferred.has(inputName)) continue;
             const input = this._inputs[inputName];
             if (input.block) {
                 const inputCached = BlocksExecuteCache.getCached(blockContainer, input.block, BlockCached);
@@ -404,6 +424,73 @@ const _prepareBlockProfiling = function (profiler, blockCached) {
     for (let i = 0; i < ops.length; i++) {
         ops[i]._profilerFrame = profiler.frame(blockFunctionProfilerId, ops[i].opcode);
     }
+};
+
+/**
+ * Evaluate a reporter block by driving the real engine on a temporary thread.
+ * @param {!Sequencer} sequencer Which sequencer is executing.
+ * @param {!Thread} thread Calling thread.
+ * @param {?string} blockId Id of the block to evaluate
+ * @param {object} context Values inherited by the reporter evaluation thread.
+ * @returns {Promise<*>} Resolves with the reported value, or '' if none.
+ */
+const evaluateReporter = async function (sequencer, thread, blockId, context = {}) {
+    if (!blockId) return '';
+
+    const engineThread = new Thread(blockId);
+    engineThread.target = thread.target;
+    engineThread.blockContainer = thread.blockContainer || thread.target.blocks;
+    engineThread.pushStack(blockId);
+
+    for (const property of inheritedReporterContextProperties) {
+        if (thread[property]) engineThread[property] = thread[property];
+    }
+    Object.assign(engineThread, context);
+
+    const callerFrame = thread.peekStackFrame();
+    const engineFrame = engineThread.peekStackFrame();
+    if (callerFrame) engineFrame.warpMode = callerFrame.warpMode;
+    let callerParams = null;
+    for (let i = thread.stackFrames.length - 1; i >= 0; i--) {
+        if (thread.stackFrames[i].params) {
+            callerParams = thread.stackFrames[i].params;
+            break;
+        }
+    }
+    if (callerParams) {
+        engineThread.initParams();
+        Object.assign(engineFrame.params, callerParams);
+    }
+
+    const WORK_TIME = 0.75 * sequencer.runtime.currentStepTime;
+    const timer = new Timer();
+    timer.start();
+    while (
+        engineThread.status !== Thread.STATUS_DONE &&
+        engineThread.stack.length > 0
+    ) {
+        if (thread.status === Thread.STATUS_DONE) return '';
+
+        if (timer.timeElapsed() >= WORK_TIME) {
+            await new Promise(resolve => setTimeout(resolve, 0));
+            timer.start();
+            continue;
+        }
+
+        if (engineThread.status === Thread.STATUS_PROMISE_WAIT) {
+            while (engineThread.status === Thread.STATUS_PROMISE_WAIT) {
+                await new Promise(resolve => setTimeout(resolve, 0));
+            }
+            timer.start();
+        } else if (engineThread.status === Thread.STATUS_YIELD_TICK) {
+            engineThread.status = Thread.STATUS_RUNNING;
+        } else {
+            sequencer.stepThread(engineThread);
+        }
+    }
+
+    const reported = engineThread.justReported;
+    return typeof reported === 'undefined' || reported === null ? '' : reported;
 };
 
 /**
@@ -600,3 +687,4 @@ const execute = function (sequencer, thread) {
 };
 
 module.exports = execute;
+module.exports.evaluateReporter = evaluateReporter;

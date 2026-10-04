@@ -82,8 +82,8 @@ class Scratch3MotionBlocks {
         let targetX = 0;
         let targetY = 0;
         if (targetName === '_mouse_') {
-            targetX = util.ioQuery('mouse', 'getScratchX');
-            targetY = util.ioQuery('mouse', 'getScratchY');
+            targetX = util.ioQuery('mouse', 'getScratchX', [util.target]);
+            targetY = util.ioQuery('mouse', 'getScratchY', [util.target]);
         } else if (targetName === '_random_') {
             const stageWidth = this.runtime.stageWidth;
             const stageHeight = this.runtime.stageHeight;
@@ -125,8 +125,8 @@ class Scratch3MotionBlocks {
         let targetX = 0;
         let targetY = 0;
         if (args.TOWARDS === '_mouse_') {
-            targetX = util.ioQuery('mouse', 'getScratchX');
-            targetY = util.ioQuery('mouse', 'getScratchY');
+            targetX = util.ioQuery('mouse', 'getScratchX', [util.target]);
+            targetY = util.ioQuery('mouse', 'getScratchY', [util.target]);
         } else if (args.TOWARDS === '_random_') {
             util.target.setDirection(Math.round(Math.random() * 360) - 180);
             return;

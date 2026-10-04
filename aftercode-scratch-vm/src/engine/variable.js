@@ -10,7 +10,7 @@ class Variable {
     /**
      * @param {string | null} id Id of the variable.
      * @param {string} name Name of the variable.
-     * @param {string} type Type of the variable, one of '' or 'list'
+     * @param {string} type Type of the variable, one of '', 'list', or 'table'
      * @param {boolean} isCloud Whether the variable is stored in the cloud.
      * @constructor
      */
@@ -25,6 +25,9 @@ class Variable {
             this.value = 0;
             break;
         case Variable.LIST_TYPE:
+            this.value = [];
+            break;
+        case Variable.TABLE_TYPE:
             this.value = [];
             break;
         case Variable.BROADCAST_MESSAGE_TYPE:
@@ -57,6 +60,14 @@ class Variable {
      */
     static get LIST_TYPE () {
         return 'list'; // used by compiler
+    }
+
+    /**
+     * Type representation for table variables.
+     * @const {string}
+     */
+    static get TABLE_TYPE () {
+        return 'table'; // used by compiler
     }
 
     /**

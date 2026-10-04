@@ -23,10 +23,12 @@ const newBlockIds = require('./util/new-block-ids');
 
 const {loadCostume} = require('./import/load-costume.js');
 const {loadSound} = require('./import/load-sound.js');
-const {serializeSounds, serializeCostumes} = require('./serialization/serialize-assets');
+const {loadAsset} = require('./import/load-asset.js');
+const {serializeSounds, serializeCostumes, serializeSpriteAssets} = require('./serialization/serialize-assets');
 require('canvas-toBlob');
 const {exportCostume} = require('./serialization/tw-costume-import-export');
 const Base64Util = require('./util/base64-util');
+const uid = require('./util/uid');
 
 const RESERVED_NAMES = ['_mouse_', '_stage_', '_edge_', '_myself_', '_random_'];
 
@@ -51,7 +53,8 @@ const createRuntimeService = runtime => {
     const service = {};
     service._refreshExtensionPrimitives = runtime._refreshExtensionPrimitives.bind(runtime);
     service._registerExtensionPrimitives = runtime._registerExtensionPrimitives.bind(runtime);
-    service._removeExtensionPrimitives = runtime._removeExtensionPrimitives.bind(runtime);
+    service._reorderExtensionPrimitive = runtime._reorderExtensionPrimitive.bind(runtime);
+    service._removeExtensionPrimitive = runtime._removeExtensionPrimitive.bind(runtime);
     return service;
 };
 
@@ -107,6 +110,12 @@ class VirtualMachine extends EventEmitter {
         this.runtime.on(Runtime.PROJECT_RUN_STOP, () => {
             this.emit(Runtime.PROJECT_RUN_STOP);
         });
+        this.runtime.on(Runtime.PROJECT_RUN_PAUSE, () => {
+            this.emit(Runtime.PROJECT_RUN_PAUSE);
+        });
+        this.runtime.on(Runtime.PROJECT_RUN_RESUME, () => {
+            this.emit(Runtime.PROJECT_RUN_RESUME);
+        });
         this.runtime.on(Runtime.PROJECT_CHANGED, () => {
             this.emit(Runtime.PROJECT_CHANGED);
         });
@@ -122,14 +131,11 @@ class VirtualMachine extends EventEmitter {
         this.runtime.on(Runtime.BLOCK_DRAG_UPDATE, areBlocksOverGui => {
             this.emit(Runtime.BLOCK_DRAG_UPDATE, areBlocksOverGui);
         });
-        this.runtime.on(Runtime.BLOCK_DRAG_END, (blocks, topBlockId) => {
-            this.emit(Runtime.BLOCK_DRAG_END, blocks, topBlockId);
+        this.runtime.on(Runtime.BLOCK_DRAG_END, (blocks, topBlockId, group) => {
+            this.emit(Runtime.BLOCK_DRAG_END, blocks, topBlockId, group);
         });
         this.runtime.on(Runtime.EXTENSION_ADDED, categoryInfo => {
             this.emit(Runtime.EXTENSION_ADDED, categoryInfo);
-        });
-        this.runtime.on(Runtime.EXTENSION_REMOVED, extensionId => {
-            this.emit(Runtime.EXTENSION_REMOVED, extensionId);
         });
         this.runtime.on(Runtime.EXTENSION_FIELD_ADDED, (fieldName, fieldImplementation) => {
             this.emit(Runtime.EXTENSION_FIELD_ADDED, fieldName, fieldImplementation);
@@ -379,6 +385,7 @@ class VirtualMachine extends EventEmitter {
      */
     clear () {
         this.runtime.dispose();
+        this.runtime.projectFolders = [];
         this.editingTarget = null;
         this.emitTargetsUpdate(false /* Don't emit project change */);
     }
@@ -631,14 +638,15 @@ class VirtualMachine extends EventEmitter {
      * @type {Array<object>} Array of all assets currently in the runtime
      */
     get assets () {
-        const costumesAndSounds = this.runtime.targets.reduce((acc, target) => (
+        const costumesSoundsAndAssets = this.runtime.targets.reduce((acc, target) => (
             acc
                 .concat(target.sprite.sounds.map(sound => sound.asset))
                 .concat(target.sprite.costumes.map(costume => costume.asset))
+                .concat(target.sprite.assets.map(asset => asset.asset))
         ), []);
         const fonts = this.runtime.fontManager.serializeAssets();
         return [
-            ...costumesAndSounds,
+            ...costumesSoundsAndAssets,
             ...fonts
         ];
     }
@@ -650,6 +658,7 @@ class VirtualMachine extends EventEmitter {
     serializeAssets (targetId) {
         const costumeDescs = serializeCostumes(this.runtime, targetId);
         const soundDescs = serializeSounds(this.runtime, targetId);
+        const assetDescs = serializeSpriteAssets(this.runtime, targetId);
         const fontDescs = this.runtime.fontManager.serializeAssets().map(asset => ({
             fileName: `${asset.assetId}.${asset.dataFormat}`,
             fileContent: asset.data
@@ -657,6 +666,7 @@ class VirtualMachine extends EventEmitter {
         return [
             ...costumeDescs,
             ...soundDescs,
+            ...assetDescs,
             ...fontDescs
         ];
     }
@@ -930,7 +940,13 @@ class VirtualMachine extends EventEmitter {
         const sb3 = require('./serialization/sb3');
         return sb3
             .deserialize(sprite, this.runtime, zip, true)
-            .then(({targets, extensions}) => this.installTargets(targets, extensions, false));
+            .then(({targets, extensions, folders}) => this.installTargets(targets, extensions, false)
+                .then(() => {
+                    if (!targets[0] || !folders || folders.length === 0) return;
+                    for (const folder of folders) folder.scopeId = targets[0].id;
+                    this.runtime.projectFolders.push(...folders);
+                    this.emitTargetsUpdate(false /* Project change is emitted by addSprite. */);
+                }));
     }
 
     /**
@@ -1030,8 +1046,10 @@ class VirtualMachine extends EventEmitter {
         const deletedCostume = this.editingTarget.deleteCostume(costumeIndex);
         if (deletedCostume) {
             const target = this.editingTarget;
+            const folderSnapshot = this._removeFolderIfEmpty(deletedCostume.folderId);
             this.runtime.emitProjectChanged();
             return () => {
+                this._restoreFolder(folderSnapshot);
                 target.addCostume(deletedCostume);
                 this.emitTargetsUpdate();
             };
@@ -1085,7 +1103,7 @@ class VirtualMachine extends EventEmitter {
      * Update a sound buffer.
      * @param {int} soundIndex - the index of the sound to be updated.
      * @param {AudioBuffer} newBuffer - new audio buffer for the audio engine.
-     * @param {ArrayBuffer} soundEncoding - the new (wav) encoded sound to be stored
+     * @param {ArrayBuffer} soundEncoding - the new (mp3) encoded sound to be stored
      */
     updateSoundBuffer (soundIndex, newBuffer, soundEncoding) {
         const sound = this.editingTarget.sprite.sounds[soundIndex];
@@ -1105,13 +1123,13 @@ class VirtualMachine extends EventEmitter {
             const storage = this.runtime.storage;
             sound.asset = storage.createAsset(
                 storage.AssetType.Sound,
-                storage.DataFormat.WAV,
+                storage.DataFormat.MP3,
                 soundEncoding,
                 null,
                 true // generate md5
             );
             sound.assetId = sound.asset.assetId;
-            sound.dataFormat = storage.DataFormat.WAV;
+            sound.dataFormat = storage.DataFormat.MP3;
             sound.md5 = `${sound.assetId}.${sound.dataFormat}`;
             sound.sampleCount = newBuffer.length;
             sound.rate = newBuffer.sampleRate;
@@ -1133,14 +1151,497 @@ class VirtualMachine extends EventEmitter {
         const target = this.editingTarget;
         const deletedSound = this.editingTarget.deleteSound(soundIndex);
         if (deletedSound) {
+            const folderSnapshot = this._removeFolderIfEmpty(deletedSound.folderId);
             this.runtime.emitProjectChanged();
             const restoreFun = () => {
+                this._restoreFolder(folderSnapshot);
                 target.addSound(deletedSound);
                 this.emitTargetsUpdate();
             };
             return restoreFun;
         }
         return null;
+    }
+
+    /**
+     * Add an asset to the current editing target.
+     * @param {!object} soundObject Object representing the asset.
+     * @param {string} optTargetId - the id of the target to add to, if not the editing target.
+     * @returns {?Promise} - a promise that resolves when the asset has been added
+     */
+    addAsset (assetObject, optTargetId) {
+        const target = optTargetId ? this.runtime.getTargetById(optTargetId) :
+            this.editingTarget;
+        if (target) {
+            return loadAsset(assetObject, this.runtime).then(() => {
+                target.addAsset(assetObject);
+                this.emitTargetsUpdate();
+            });
+        }
+        // If the target cannot be found by id, return a rejected promise
+        return Promise.reject(new Error(`No target with ID: ${optTargetId}`));
+    }
+
+    /**
+     * Delete a asset from the current editing target.
+     * @param {int} assetIndex - the index of the asset to be removed.
+     * @return {?Function} A function to restore the asset that was deleted,
+     * or null, if no asset was deleted.
+     */
+    deleteAsset (assetIndex) {
+        const target = this.editingTarget;
+        const deletedAsset = this.editingTarget.deleteAsset(assetIndex);
+        if (deletedAsset) {
+            const folderSnapshot = this._removeFolderIfEmpty(deletedAsset.folderId);
+            this.runtime.emitProjectChanged();
+            const restoreFun = () => {
+                this._restoreFolder(folderSnapshot);
+                target.addAsset(deletedAsset);
+                this.emitTargetsUpdate();
+            };
+            return restoreFun;
+        }
+        return null;
+    }
+
+    /**
+     * Reorder the assets of a target if it exists. Return whether it occured.
+     * @param {!string} targetId ID of the target which owns the assets.
+     * @param {!number} assetIndex index of the asset to move.
+     * @param {!number} newIndex index that the asset should be moved to.
+     * @returns {boolean} Whether an asset was reordered.
+     */
+    reorderAsset (targetId, assetIndex, newIndex) {
+        const target = this.runtime.getTargetById(targetId);
+        if (target) {
+            const reorderSuccessful = target.reorderAsset(assetIndex, newIndex);
+            if (reorderSuccessful) {
+                this.runtime.emitProjectChanged();
+            }
+            return reorderSuccessful;
+        }
+        return false;
+    }
+
+    /**
+     * Duplicate the asset at the given index. Add it at that index + 1.
+     * @param {!int} assetIndex Index of asset to duplicate
+     * @returns {?Promise} - a promise that resolves when the asset has been added
+     */
+    duplicateAsset (assetIndex) {
+        const originalAsset = this.editingTarget.getAssets()[assetIndex];
+        const clone = Object.assign({}, originalAsset);
+        return new Promise(resolve => {
+            this.editingTarget.addAsset(clone, assetIndex + 1);
+            this.emitTargetsUpdate();
+            resolve();
+        });
+    }
+
+    /**
+     * Rename an asset on the current editing target.
+     * @param {int} assetIndex - the index of the asset to be renamed.
+     * @param {string} newName - the desired new name of the asset (will be modified if already in use).
+     */
+    renameAsset (assetIndex, newName, extension) {
+        this.editingTarget.renameAsset(assetIndex, newName, extension);
+        this.emitTargetsUpdate();
+    }
+
+    /**
+     * Create a folder. Folder IDs, rather than folder names, are stored
+     * on children so renaming never mutates an item's name.
+     * @param {string} name Display name
+     * @param {'sprite'|'costume'|'sound'|'asset'} kind Item kind
+     * @param {?string} scopeId Target ID for target-owned assets, otherwise null
+     * @param {?string} parentId Parent folder ID
+     * @returns {object} The new folder record
+     */
+    createFolder (name, kind, scopeId = null, parentId = null) {
+        const allowedKinds = ['sprite', 'costume', 'sound', 'asset'];
+        if (typeof name !== 'string' || !name.trim()) throw new Error('Folder name must not be empty.');
+        if (allowedKinds.indexOf(kind) === -1) throw new Error(`Unsupported folder kind: ${kind}`);
+        if (kind === 'sprite' && scopeId !== null) throw new Error('Sprite folders cannot have a target scope.');
+        if (kind !== 'sprite') {
+            const scopeTarget = this.runtime.getTargetById(scopeId);
+            if (!scopeTarget || !scopeTarget.isOriginal) throw new Error('Folder scope target does not exist.');
+        }
+        const normalizedName = name.trim();
+        const existing = this.runtime.projectFolders.find(folder =>
+            folder.kind === kind && folder.scopeId === scopeId && folder.parentId === parentId &&
+            folder.name.toLocaleLowerCase() === normalizedName.toLocaleLowerCase()
+        );
+        if (existing) return Object.assign({}, existing);
+        if (parentId) {
+            const parent = this.runtime.projectFolders.find(folder => folder.id === parentId);
+            if (!parent || parent.kind !== kind || parent.scopeId !== scopeId) {
+                throw new Error('Parent folder does not exist in this scope.');
+            }
+        }
+        const folder = {
+            id: uid(),
+            name: normalizedName,
+            kind,
+            scopeId,
+            parentId,
+            color: '#d8b24a',
+            _isOpen: true
+        };
+        this.runtime.projectFolders.push(folder);
+        this.emitTargetsUpdate();
+        return Object.assign({}, folder);
+    }
+
+    renameFolder (folderId, name) {
+        const folder = this.runtime.projectFolders.find(item => item.id === folderId);
+        if (!folder) throw new Error('Folder does not exist.');
+        if (typeof name !== 'string' || !name.trim()) throw new Error('Folder name must not be empty.');
+        const normalizedName = name.trim();
+        if (folder.name === normalizedName) return false;
+        const duplicate = this.runtime.projectFolders.some(item => item.id !== folderId &&
+            item.kind === folder.kind && item.scopeId === folder.scopeId && item.parentId === folder.parentId &&
+            item.name.toLocaleLowerCase() === normalizedName.toLocaleLowerCase());
+        if (duplicate) throw new Error('A folder with that name already exists in this scope.');
+        folder.name = normalizedName;
+        this.emitTargetsUpdate();
+        return true;
+    }
+
+    setFolderColor (folderId, color) {
+        const folder = this.runtime.projectFolders.find(item => item.id === folderId);
+        if (!folder) throw new Error('Folder does not exist.');
+        if (typeof color !== 'string' || !/^#[0-9a-f]{6}$/i.test(color)) {
+            throw new Error('Folder color must be a six-digit hex color.');
+        }
+        const normalizedColor = color.toLowerCase();
+        if (folder.color === normalizedColor) return false;
+        folder.color = normalizedColor;
+        this.emitTargetsUpdate();
+        return true;
+    }
+
+    setFolderOpen (folderId, open) {
+        const folder = this.runtime.projectFolders.find(item => item.id === folderId);
+        if (!folder) return false;
+        if (typeof open !== 'boolean') throw new Error('Folder open state must be a boolean.');
+        if (folder._isOpen === open) return false;
+        folder._isOpen = open;
+        this.emitTargetsUpdate();
+        return true;
+    }
+
+    /**
+     * Move a folder into another folder, or to the root of its scope.
+     * @param {string} folderId Folder to move
+     * @param {?string} parentId Destination parent folder, or null for root
+     * @returns {boolean} true when the parent changed
+     */
+    setFolderParent (folderId, parentId) {
+        const folder = this.runtime.projectFolders.find(item => item.id === folderId);
+        if (!folder) throw new Error('Folder does not exist.');
+        const normalizedParentId = parentId || null;
+        if (folder.parentId === normalizedParentId) return false;
+        if (normalizedParentId === folderId) throw new Error('A folder cannot contain itself.');
+
+        if (normalizedParentId) {
+            const parent = this.runtime.projectFolders.find(item => item.id === normalizedParentId);
+            if (!parent || parent.kind !== folder.kind || parent.scopeId !== folder.scopeId) {
+                throw new Error('Parent folder does not exist in this scope.');
+            }
+            let ancestor = parent;
+            const visitedAncestorIds = new Set();
+            while (ancestor && !visitedAncestorIds.has(ancestor.id)) {
+                if (ancestor.id === folderId) throw new Error('A folder cannot be moved into its descendant.');
+                visitedAncestorIds.add(ancestor.id);
+                const ancestorParentId = ancestor.parentId;
+                ancestor = this.runtime.projectFolders.find(item => item.id === ancestorParentId);
+            }
+            if (ancestor) throw new Error('Parent folder hierarchy contains a cycle.');
+        }
+
+        const duplicate = this.runtime.projectFolders.some(item => item.id !== folderId &&
+            item.kind === folder.kind && item.scopeId === folder.scopeId && item.parentId === normalizedParentId &&
+            item.name.toLocaleLowerCase() === folder.name.toLocaleLowerCase());
+        if (duplicate) throw new Error('A folder with that name already exists in this scope.');
+
+        const oldParentId = folder.parentId;
+        folder.parentId = normalizedParentId;
+        if (oldParentId) this._removeFolderIfEmpty(oldParentId);
+        this.emitTargetsUpdate();
+        return true;
+    }
+
+    moveFolderToIndex (folderId, newIndex) {
+        const folder = this.runtime.projectFolders.find(item => item.id === folderId);
+        if (!folder) throw new Error('Folder does not exist.');
+        const target = folder.kind === 'sprite' ? null : this.runtime.getTargetById(folder.scopeId);
+        const collections = target && {
+            costume: target.getCostumes(), sound: target.getSounds(), asset: target.getAssets()
+        };
+        const items = folder.kind === 'sprite' ?
+            this.runtime.targets.filter(item => item.isOriginal) : collections && collections[folder.kind];
+        if (!items) return false;
+        const descendantIds = new Set([folderId]);
+        let foundDescendant = true;
+        while (foundDescendant) {
+            foundDescendant = false;
+            for (const candidate of this.runtime.projectFolders) {
+                if (descendantIds.has(candidate.parentId) && !descendantIds.has(candidate.id)) {
+                    descendantIds.add(candidate.id);
+                    foundDescendant = true;
+                }
+            }
+        }
+        const members = items.filter(item => item && descendantIds.has(item.folderId));
+        if (members.length === 0 || !Number.isFinite(newIndex)) return false;
+        const selectedCostume = folder.kind === 'costume' ? items[target.currentCostume] : null;
+        const oldIndex = items.findIndex(item => item && descendantIds.has(item.folderId));
+        newIndex = Math.max(0, Math.min(items.length - 1, Math.trunc(newIndex)));
+        const destination = items[newIndex];
+        if (destination && descendantIds.has(destination.folderId)) return false;
+        let boundary = newIndex > oldIndex ? newIndex + 1 : newIndex;
+        if (destination && destination.folderId && destination.folderId !== folderId) {
+            const destinationMembers = items
+                .map((item, index) => ({item, index}))
+                .filter(entry => entry.item && entry.item.folderId === destination.folderId);
+            boundary = newIndex > oldIndex ?
+                destinationMembers[destinationMembers.length - 1].index + 1 : destinationMembers[0].index;
+        }
+        const remaining = items.filter(item => !item || !descendantIds.has(item.folderId));
+        const minimum = folder.kind === 'sprite' && remaining[0] && remaining[0].isStage ? 1 : 0;
+        const insertionIndex = Math.max(minimum, Math.min(remaining.length,
+            items.slice(0, boundary).filter(item => !item || !descendantIds.has(item.folderId)).length));
+        remaining.splice(insertionIndex, 0, ...members);
+        if (remaining.every((item, index) => item === items[index])) return false;
+        if (folder.kind === 'sprite') this._setOriginalTargetOrder(remaining);
+        else target.sprite[`${folder.kind}s`] = remaining;
+        if (selectedCostume) target.currentCostume = remaining.indexOf(selectedCostume);
+        this.emitTargetsUpdate();
+        return true;
+    }
+
+    _getFolderItems (folder) {
+        if (folder.kind === 'sprite') {
+            return this.runtime.targets.filter(target => target.isOriginal && !target.isStage);
+        }
+        const target = this.runtime.getTargetById(folder.scopeId);
+        if (!target) return [];
+        const collections = {
+            costume: target.getCostumes(),
+            sound: target.getSounds(),
+            asset: target.getAssets()
+        };
+        return collections[folder.kind] || [];
+    }
+
+    _setOriginalTargetOrder (originalTargets) {
+        const reorderedTargets = this.runtime.targets.slice();
+        let originalIndex = 0;
+        for (let targetIndex = 0; targetIndex < reorderedTargets.length; targetIndex++) {
+            if (reorderedTargets[targetIndex].isOriginal) {
+                reorderedTargets[targetIndex] = originalTargets[originalIndex++];
+            }
+        }
+        this.runtime.targets = reorderedTargets;
+    }
+
+    _removeFolderIfEmpty (folderId) {
+        const snapshots = [];
+        const originalIndices = new Map(this.runtime.projectFolders.map((folder, index) => [folder.id, index]));
+        const visitedFolderIds = new Set();
+        let candidateId = folderId;
+        while (candidateId && !visitedFolderIds.has(candidateId)) {
+            visitedFolderIds.add(candidateId);
+            let index = -1;
+            for (let folderIndex = 0; folderIndex < this.runtime.projectFolders.length; folderIndex++) {
+                if (this.runtime.projectFolders[folderIndex].id === candidateId) {
+                    index = folderIndex;
+                    break;
+                }
+            }
+            if (index < 0) break;
+            const folder = this.runtime.projectFolders[index];
+            let hasMembers = false;
+            for (const item of this._getFolderItems(folder)) {
+                if (item && item.folderId === candidateId) {
+                    hasMembers = true;
+                    break;
+                }
+            }
+            let hasChildren = false;
+            for (const item of this.runtime.projectFolders) {
+                if (item.parentId === candidateId) {
+                    hasChildren = true;
+                    break;
+                }
+            }
+            if (hasMembers || hasChildren) break;
+            snapshots.push({folder: Object.assign({}, folder), index: originalIndices.get(folder.id)});
+            this.runtime.projectFolders.splice(index, 1);
+            candidateId = folder.parentId;
+        }
+        return snapshots.length ? snapshots : null;
+    }
+
+    _restoreFolder (snapshot) {
+        const snapshots = Array.isArray(snapshot) ? snapshot : snapshot && [snapshot];
+        if (!snapshots) return;
+        snapshots.slice().sort((first, second) => first.index - second.index)
+            .forEach(entry => {
+                if (this.runtime.projectFolders.some(folder => folder.id === entry.folder.id)) return;
+                const index = Math.max(0, Math.min(this.runtime.projectFolders.length, entry.index));
+                this.runtime.projectFolders.splice(index, 0, Object.assign({}, entry.folder));
+            });
+    }
+
+    deleteFolder (folderId) {
+        const folder = this.runtime.projectFolders.find(item => item.id === folderId);
+        if (!folder) return false;
+        const siblingNames = this.runtime.projectFolders
+            .filter(item => item.id !== folderId && item.kind === folder.kind && item.scopeId === folder.scopeId &&
+                item.parentId === folder.parentId)
+            .map(item => item.name);
+        for (const child of this.runtime.projectFolders) {
+            if (child.parentId === folderId) {
+                child.name = StringUtil.caseInsensitiveUnusedName(child.name, siblingNames);
+                siblingNames.push(child.name);
+                child.parentId = folder.parentId;
+            }
+        }
+        for (const target of this.runtime.targets) {
+            if (target.folderId === folderId) target.folderId = folder.parentId;
+            for (const item of [...target.getCostumes(), ...target.getSounds(), ...target.getAssets()]) {
+                if (item && item.folderId === folderId) item.folderId = folder.parentId;
+            }
+        }
+        this.runtime.projectFolders = this.runtime.projectFolders.filter(item => item.id !== folderId);
+        this.emitTargetsUpdate();
+        return true;
+    }
+
+    deleteFolderWithContents (folderId) {
+        const folder = this.runtime.projectFolders.find(item => item.id === folderId);
+        if (!folder) return false;
+        const parentId = folder.parentId;
+        const folderIds = new Set([folderId]);
+        let foundDescendant = true;
+        while (foundDescendant) {
+            foundDescendant = false;
+            for (const candidate of this.runtime.projectFolders) {
+                if (folderIds.has(candidate.parentId) && !folderIds.has(candidate.id)) {
+                    folderIds.add(candidate.id);
+                    foundDescendant = true;
+                }
+            }
+        }
+
+        if (folder.kind === 'sprite') {
+            const targets = this.runtime.targets.filter(target =>
+                target.isOriginal && !target.isStage && folderIds.has(target.folderId));
+            targets.forEach(target => this.deleteSprite(target.id));
+        } else {
+            const target = this.runtime.getTargetById(folder.scopeId);
+            const collections = target && {
+                costume: target.getCostumes(),
+                sound: target.getSounds(),
+                asset: target.getAssets()
+            };
+            const items = collections && collections[folder.kind];
+            if (items) {
+                for (let index = items.length - 1; index >= 0; index--) {
+                    if (!folderIds.has(items[index].folderId)) continue;
+                    if (folder.kind === 'costume') target.deleteCostume(index);
+                    else if (folder.kind === 'sound') target.deleteSound(index);
+                    else target.deleteAsset(index);
+                }
+                // A target must retain one costume. If every costume was in
+                // the deleted subtree, move the undeletable final costume out.
+                items.forEach(item => {
+                    if (item && folderIds.has(item.folderId)) item.folderId = parentId;
+                });
+            }
+        }
+
+        this.runtime.projectFolders = this.runtime.projectFolders.filter(candidate => !folderIds.has(candidate.id));
+        if (parentId) this._removeFolderIfEmpty(parentId);
+        this.emitTargetsUpdate();
+        return true;
+    }
+
+    /**
+     * Set explicit folder membership for a sprite or target-owned asset and,
+     * optionally, move it in the same atomic update.
+     * @param {'sprite'|'costume'|'sound'|'asset'} kind item kind
+     * @param {string} targetId target owning the item, or the sprite target ID
+     * @param {?number} itemIndex index in the target-owned collection
+     * @param {?string} folderId destination folder, or null for the root
+     * @param {number=} newIndex final index in the underlying collection;
+     * sprite indices include the stage at index zero
+     * @returns {boolean} true when membership or ordering changed
+     */
+    setItemFolder (kind, targetId, itemIndex, folderId, newIndex) {
+        const target = this.runtime.getTargetById(targetId);
+        if (!target) throw new Error('Target does not exist.');
+        let item;
+        let items;
+        if (kind === 'sprite') {
+            item = target;
+            if (target.isStage || !target.isOriginal) throw new Error('Only original sprites can be put in folders.');
+            items = this.runtime.targets.filter(candidate => candidate.isOriginal);
+        } else {
+            if (!target.isOriginal) throw new Error('Only original targets can own asset folders.');
+            const collections = {
+                costume: target.getCostumes(),
+                sound: target.getSounds(),
+                asset: target.getAssets()
+            };
+            items = collections[kind];
+            if (!Number.isInteger(itemIndex)) throw new Error('Folder item index must be an integer.');
+            item = items && items[itemIndex];
+        }
+        if (!item) throw new Error('Folder item does not exist.');
+        const oldFolderId = item.folderId || null;
+        const normalizedFolderId = folderId || null;
+        if (normalizedFolderId) {
+            const folder = this.runtime.projectFolders.find(candidate => candidate.id === normalizedFolderId);
+            const scopeId = kind === 'sprite' ? null : targetId;
+            if (!folder || folder.kind !== kind || folder.scopeId !== scopeId) {
+                throw new Error('Folder does not exist in this item scope.');
+            }
+        }
+        const membershipChanged = oldFolderId !== normalizedFolderId;
+        if (!membershipChanged && typeof newIndex === 'undefined') return false;
+        const sourceIndex = items.indexOf(item);
+        const selectedCostume = kind === 'costume' ? items[target.currentCostume] : null;
+        let destinationIndex = null;
+        if (typeof newIndex === 'undefined') {
+            const adjacentFolderId = normalizedFolderId || oldFolderId;
+            const lastMemberIndex = items.reduce((lastIndex, candidate, index) =>
+                (candidate && candidate !== item && candidate.folderId === adjacentFolderId ? index : lastIndex), -1);
+            if (lastMemberIndex >= 0) {
+                const boundary = lastMemberIndex + 1;
+                destinationIndex = boundary - (sourceIndex < boundary ? 1 : 0);
+            }
+        } else {
+            if (!Number.isFinite(newIndex)) throw new Error('Folder item destination must be finite.');
+            destinationIndex = Math.max(kind === 'sprite' ? 1 : 0,
+                Math.min(items.length - 1, Math.trunc(newIndex)));
+        }
+        let orderChanged = false;
+        if (destinationIndex !== null && destinationIndex !== sourceIndex) {
+            const reordered = items.slice();
+            reordered.splice(sourceIndex, 1);
+            reordered.splice(destinationIndex, 0, item);
+            if (kind === 'sprite') this._setOriginalTargetOrder(reordered);
+            else target.sprite[`${kind}s`] = reordered;
+            if (selectedCostume) target.currentCostume = reordered.indexOf(selectedCostume);
+            orderChanged = true;
+        }
+        if (!membershipChanged && !orderChanged) return false;
+        item.folderId = normalizedFolderId;
+        if (membershipChanged && oldFolderId) this._removeFolderIfEmpty(oldFolderId);
+        this.emitTargetsUpdate();
+        return true;
     }
 
     /**
@@ -1368,8 +1869,22 @@ class VirtualMachine extends EventEmitter {
             if (!sprite) {
                 throw new Error('No sprite associated with this target.');
             }
+            const spriteFolderId = target.folderId;
             const spritePromise = this.exportSprite(targetId, 'uint8array');
-            const restoreSprite = () => spritePromise.then(spriteBuffer => this.addSprite(spriteBuffer));
+            let spriteFolderSnapshot = null;
+            const restoreSprite = () => spritePromise.then(spriteBuffer => {
+                const existingTargetIds = new Set(this.runtime.targets.map(item => item.id));
+                return this.addSprite(spriteBuffer).then(() => {
+                    const restoredTarget = this.runtime.targets.find(item =>
+                        item.isOriginal && !existingTargetIds.has(item.id)
+                    );
+                    if (!restoredTarget || !spriteFolderId) return;
+                    this._restoreFolder(spriteFolderSnapshot);
+                    if (this.runtime.projectFolders.some(folder => folder.id === spriteFolderId)) {
+                        this.setItemFolder('sprite', restoredTarget.id, null, spriteFolderId);
+                    }
+                });
+            });
             // Remove monitors from the runtime state and remove the
             // target-specific monitored blocks (e.g. local variables)
             target.deleteMonitors();
@@ -1388,6 +1903,8 @@ class VirtualMachine extends EventEmitter {
                     }
                 }
             }
+            this.runtime.projectFolders = this.runtime.projectFolders.filter(folder => folder.scopeId !== targetId);
+            spriteFolderSnapshot = this._removeFolderIfEmpty(spriteFolderId);
             // Sprite object should be deleted by GC.
             this.emitTargetsUpdate();
             return restoreSprite;
@@ -1412,6 +1929,31 @@ class VirtualMachine extends EventEmitter {
             throw new Error('No sprite associated with this target.');
         }
         return target.duplicate().then(newTarget => {
+            const spriteFolder = this.runtime.projectFolders.find(folder =>
+                folder.id === target.folderId && folder.kind === 'sprite' && folder.scopeId === null
+            );
+            newTarget.folderId = spriteFolder ? spriteFolder.id : null;
+
+            const sourceFolders = this.runtime.projectFolders.filter(folder => folder.scopeId === target.id);
+            const sourceFoldersById = new Map(sourceFolders.map(folder => [folder.id, folder]));
+            const folderIdMap = new Map(sourceFolders.map(folder => [folder.id, uid()]));
+            const duplicatedFolders = sourceFolders.map(folder => Object.assign({}, folder, {
+                id: folderIdMap.get(folder.id),
+                scopeId: newTarget.id,
+                parentId: folderIdMap.get(folder.parentId) || null
+            }));
+            for (const [kind, items] of [
+                ['costume', newTarget.getCostumes()],
+                ['sound', newTarget.getSounds()],
+                ['asset', newTarget.getAssets()]
+            ]) {
+                for (const item of items) {
+                    const candidateFolder = sourceFoldersById.get(item.folderId);
+                    const sourceFolder = candidateFolder && candidateFolder.kind === kind ? candidateFolder : null;
+                    item.folderId = sourceFolder ? folderIdMap.get(sourceFolder.id) : null;
+                }
+            }
+            this.runtime.projectFolders.push(...duplicatedFolders);
             this.runtime.addTarget(newTarget);
             newTarget.goBehindOther(target);
             this.setEditingTarget(newTarget.id);
@@ -1576,11 +2118,11 @@ class VirtualMachine extends EventEmitter {
      * shared from that target. This is needed for resolving any potential variable conflicts.
      * @return {!Promise} Promise that resolves when the extensions and blocks have been added.
      */
-    shareBlocksToTarget (blocks, targetId, optFromTargetId) {
+    shareBlocksToTarget (blocks, targetId, optFromTargetId, optGroup) {
         const sb3 = require('./serialization/sb3');
 
         const {blocks: copiedBlocks, extensionURLs} = sb3.deserializeStandaloneBlocks(blocks);
-        newBlockIds(copiedBlocks);
+        const blockIdMap = newBlockIds(copiedBlocks);
         const target = this.runtime.getTargetById(targetId);
 
         if (optFromTargetId) {
@@ -1601,6 +2143,12 @@ class VirtualMachine extends EventEmitter {
             copiedBlocks.forEach(block => {
                 target.blocks.createBlock(block);
             });
+            if (optGroup) {
+                target.createGroup(Object.assign({}, optGroup, {
+                    id: null,
+                    blocks: optGroup.blocks.map(id => blockIdMap[id]).filter(Boolean)
+                }));
+            }
             target.blocks.updateTargetSpecificBlocks(target.isStage);
         });
     }
@@ -1615,6 +2163,7 @@ class VirtualMachine extends EventEmitter {
     shareCostumeToTarget (costumeIndex, targetId) {
         const originalCostume = this.editingTarget.getCostumes()[costumeIndex];
         const clone = Object.assign({}, originalCostume);
+        clone.folderId = null;
         const md5ext = `${clone.assetId}.${clone.dataFormat}`;
         return loadCostume(md5ext, clone, this.runtime).then(() => {
             const target = this.runtime.getTargetById(targetId);
@@ -1637,11 +2186,31 @@ class VirtualMachine extends EventEmitter {
         const originalSound = this.editingTarget.getSounds()[soundIndex];
         const clone = Object.assign({}, originalSound);
         const target = this.runtime.getTargetById(targetId);
+        clone.folderId = null;
         return loadSound(clone, this.runtime, target.sprite.soundBank).then(() => {
             if (target) {
                 target.addSound(clone);
                 this.emitTargetsUpdate();
             }
+        });
+    }
+
+    /**
+     * Called when assets are dragged from editing target to another target.
+     * @param {!number} assetIndex Index of the asset of the editing target to share.
+     * @param {!string} targetId Id of target to add the asset.
+     * @return {Promise} Promise that resolves when the new asset has been loaded.
+     */
+    shareAssetToTarget (assetIndex, targetId) {
+        const originalAsset = this.editingTarget.getAssets()[assetIndex];
+        const clone = Object.assign({}, originalAsset);
+        clone.folderId = null;
+        const target = this.runtime.getTargetById(targetId);
+        return new Promise(resolve => {
+            if (target) {
+                target.addAsset(clone);
+            }
+            resolve();
         });
     }
 
@@ -1737,6 +2306,7 @@ class VirtualMachine extends EventEmitter {
         const workspaceComments = Object.keys(this.editingTarget.comments)
             .map(k => this.editingTarget.comments[k])
             .filter(c => c.blockId === null);
+        const workspaceGroups = Object.values(this.editingTarget.groups || {});
 
         const xmlString = `<xml xmlns="http://www.w3.org/1999/xhtml">
                             <variables>
@@ -1744,6 +2314,7 @@ class VirtualMachine extends EventEmitter {
                                 ${localVariables.map(v => v.toXML(true)).join()}
                             </variables>
                             ${workspaceComments.map(c => c.toXML()).join()}
+                            ${workspaceGroups.map(g => g.toXML()).join()}
                             ${this.editingTarget.blocks.toXML(this.editingTarget.comments)}
                         </xml>`;
 

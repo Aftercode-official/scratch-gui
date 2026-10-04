@@ -30,8 +30,26 @@ class Scratch3DataBlocks {
             data_itemnumoflist: this.getItemNumOfList,
             data_lengthoflist: this.lengthOfList,
             data_listcontainsitem: this.listContainsItem,
+            data_listasarray: this.listAsArray,
+            data_setlistarray: this.setListArray,
             data_hidelist: this.hideList,
-            data_showlist: this.showList
+            data_showlist: this.showList,
+            data_tablecontents: this.getTableContents,
+            data_addtotable: this.addToTable,
+            data_insertdimensiontotable: this.insertDimensionToTable,
+            data_setcellintable: this.setCellInTable,
+            data_deletecellintable: this.deleteCellInTable,
+            data_deletedimensionintable: this.deleteDimensionInTable,
+            data_deletealloftable: this.deleteAllOfTable,
+            data_itemincelloftable: this.itemInCellOfTable,
+            data_itemsofdimensionoftable: this.itemsOfDimensionOfTable,
+            data_lengthofdimensionoftable: this.lengthOfDimensionOfTable,
+            data_dimensioncountoftable: this.dimensionCountOfTable,
+            data_tablecontainsitemincell: this.tableContainsItemInCell,
+            data_tableasarray: this.tableAsArray,
+            data_settableusingarray: this.setTableUsingArray,
+            data_showtable: this.showTable,
+            data_hidetable: this.hideTable
         };
     }
 
@@ -119,8 +137,7 @@ class Scratch3DataBlocks {
         if (allSingleLetters) {
             return list.value.join('');
         }
-        return list.value.join(' ');
-
+        return list.value.map(item => Cast.toString(item)).join(' ');
     }
 
     addToList (args, util) {
@@ -234,6 +251,282 @@ class Scratch3DataBlocks {
             }
         }
         return false;
+    }
+
+    listAsArray (args, util) {
+        const list = util.target.lookupOrCreateList(
+            args.LIST.id, args.LIST.name);
+        return Cast.toArray(list.value);
+    }
+
+    setListArray (args, util) {
+        const list = util.target.lookupOrCreateList(
+            args.LIST.id, args.LIST.name);
+        list.value = Cast.toArray(args.ARRAY);
+        list._monitorUpToDate = false;
+    }
+
+    getTableContents (args, util) {
+        const table = util.target.lookupOrCreateTable(
+            args.TABLE.id, args.TABLE.name);
+
+        // If block is running for monitors, return copy of list as an array if changed.
+        if (util.thread.updateMonitor) {
+            // Return original list value if up-to-date, which doesn't trigger monitor update.
+            if (table._monitorUpToDate) return table.value;
+            // If value changed, reset the flag and return a copy to trigger monitor update.
+            // Because monitors use Immutable data structures, only new objects trigger updates.
+            table._monitorUpToDate = true;
+            return table.value.map(row => {
+                if (Array.isArray(row)) {
+                    return row.slice();
+                }
+                return row;
+            });
+        }
+
+        // Flatten the table to a string representation
+        // Each row is joined with spaces, rows are separated by newlines
+        return table.value.map(row => {
+            if (Array.isArray(row)) {
+                return row.map(cell => Cast.toString(cell)).join(' ');
+            }
+            return Cast.toString(row);
+        }).join('\n');
+    }
+
+    addToTable (args, util) {
+        const table = util.target.lookupOrCreateTable(
+            args.TABLE.id, args.TABLE.name);
+        if (args.DIMENSION === 'column') {
+            if (table.value.length === 0) {
+                table.value.push(['']);
+            } else {
+                for (let i = 0; i < table.value.length; i++) {
+                    if (Array.isArray(table.value[i])) {
+                        table.value[i].push('');
+                    }
+                }
+            }
+        } else if (args.DIMENSION === 'row') {
+            const columnCount = table.value.length > 0 && Array.isArray(table.value[0]) ?
+                table.value[0].length :
+                1;
+            const newRow = Array(columnCount).fill('');
+            table.value.push(newRow);
+        }
+        table._monitorUpToDate = false;
+    }
+
+    insertDimensionToTable (args, util) {
+        const table = util.target.lookupOrCreateTable(
+            args.TABLE.id, args.TABLE.name);
+        let index;
+        if (args.DIMENSION === 'column') {
+            const columnCount = Cast.getTableColumnCount(table.value);
+            index = Cast.toListIndex(args.INDEX, columnCount + 1, false);
+        } else {
+            const rowCount = Cast.getTableRowCount(table.value);
+            index = Cast.toListIndex(args.INDEX, rowCount + 1, false);
+        }
+        if (index === Cast.LIST_INVALID) {
+            return;
+        }
+        if (args.DIMENSION === 'column') {
+            if (table.value.length === 0) {
+                table.value.push(['']);
+            } else {
+                for (let i = 0; i < table.value.length; i++) {
+                    if (Array.isArray(table.value[i])) {
+                        table.value[i].splice(index - 1, 0, '');
+                    }
+                }
+            }
+        } else if (args.DIMENSION === 'row') {
+            const columnCount = Cast.getTableColumnCount(table.value);
+            const newRow = Array(columnCount || 1).fill('');
+            table.value.splice(index - 1, 0, newRow);
+        }
+        table._monitorUpToDate = false;
+    }
+
+    setCellInTable (args, util) {
+        const table = util.target.lookupOrCreateTable(
+            args.TABLE.id, args.TABLE.name);
+        const rowIndex = Cast.toTableRowIndex(args.ROW, table.value, false);
+        const columnIndex = Cast.toTableColumnIndex(args.COLUMN, table.value, false);
+        if (rowIndex === Cast.LIST_INVALID || columnIndex === Cast.LIST_INVALID) {
+            return;
+        }
+        if (table.value[rowIndex - 1] && Array.isArray(table.value[rowIndex - 1])) {
+            table.value[rowIndex - 1][columnIndex - 1] = args.ITEM;
+            table._monitorUpToDate = false;
+        }
+    }
+
+    deleteCellInTable (args, util) {
+        const table = util.target.lookupOrCreateTable(
+            args.TABLE.id, args.TABLE.name);
+        const rowIndex = Cast.toTableRowIndex(args.ROW, table.value, false);
+        const columnIndex = Cast.toTableColumnIndex(args.COLUMN, table.value, false);
+        if (rowIndex === Cast.LIST_INVALID || columnIndex === Cast.LIST_INVALID) {
+            return;
+        }
+        if (table.value[rowIndex - 1] && Array.isArray(table.value[rowIndex - 1])) {
+            table.value[rowIndex - 1][columnIndex - 1] = '';
+            table._monitorUpToDate = false;
+        }
+    }
+
+    deleteDimensionInTable (args, util) {
+        const table = util.target.lookupOrCreateTable(
+            args.TABLE.id, args.TABLE.name);
+        let index;
+        if (args.DIMENSION === 'column') {
+            index = Cast.toTableColumnIndex(args.INDEX, table.value, false);
+        } else {
+            index = Cast.toTableRowIndex(args.INDEX, table.value, false);
+        }
+        if (index === Cast.LIST_INVALID) {
+            return;
+        }
+        if (args.DIMENSION === 'column') {
+            for (let i = 0; i < table.value.length; i++) {
+                if (Array.isArray(table.value[i])) {
+                    table.value[i].splice(index - 1, 1);
+                }
+            }
+            if (Cast.getTableColumnCount(table.value) === 0) {
+                table.value = [];
+            }
+        } else if (args.DIMENSION === 'row') {
+            table.value.splice(index - 1, 1);
+        }
+        table._monitorUpToDate = false;
+    }
+
+    deleteAllOfTable (args, util) {
+        const table = util.target.lookupOrCreateTable(
+            args.TABLE.id, args.TABLE.name);
+        table.value = [];
+        table._monitorUpToDate = false;
+    }
+
+    itemInCellOfTable (args, util) {
+        const table = util.target.lookupOrCreateTable(
+            args.TABLE.id, args.TABLE.name);
+        const rowIndex = Cast.toTableRowIndex(args.ROW, table.value, false);
+        const columnIndex = Cast.toTableColumnIndex(args.COLUMN, table.value, false);
+        if (rowIndex === Cast.LIST_INVALID || columnIndex === Cast.LIST_INVALID) {
+            return '';
+        }
+        if (table.value[rowIndex - 1] && Array.isArray(table.value[rowIndex - 1])) {
+            return table.value[rowIndex - 1][columnIndex - 1] || '';
+        }
+        return '';
+    }
+
+    itemsOfDimensionOfTable (args, util) {
+        const table = util.target.lookupOrCreateTable(
+            args.TABLE.id, args.TABLE.name);
+        if (args.DIMENSION === 'column') {
+            const columnIndex = Cast.toTableColumnIndex(args.INDEX, table.value, false);
+            if (columnIndex === Cast.LIST_INVALID) {
+                return [];
+            }
+            const column = [];
+            for (let i = 0; i < table.value.length; i++) {
+                if (Array.isArray(table.value[i])) {
+                    column.push(table.value[i][columnIndex - 1] || '');
+                }
+            }
+            return column;
+        }
+        const rowIndex = Cast.toTableRowIndex(args.INDEX, table.value, false);
+        if (rowIndex === Cast.LIST_INVALID) {
+            return [];
+        }
+        if (table.value[rowIndex - 1] && Array.isArray(table.value[rowIndex - 1])) {
+            return table.value[rowIndex - 1].slice();
+        }
+        return [];
+    }
+
+    lengthOfDimensionOfTable (args, util) {
+        const table = util.target.lookupOrCreateTable(
+            args.TABLE.id, args.TABLE.name);
+        if (args.DIMENSION === 'column') {
+            const columnIndex = Cast.toTableColumnIndex(args.INDEX, table.value, false);
+            if (columnIndex === Cast.LIST_INVALID) {
+                return 0;
+            }
+            return table.value.length;
+        }
+        const rowIndex = Cast.toTableRowIndex(args.INDEX, table.value, false);
+        if (rowIndex === Cast.LIST_INVALID) {
+            return 0;
+        }
+        if (table.value[rowIndex - 1] && Array.isArray(table.value[rowIndex - 1])) {
+            return table.value[rowIndex - 1].length;
+        }
+        return 0;
+    }
+
+    dimensionCountOfTable (args, util) {
+        const table = util.target.lookupOrCreateTable(
+            args.TABLE.id, args.TABLE.name);
+        if (args.DIMENSION === 'column') {
+            return Cast.getTableColumnCount(table.value);
+        }
+        return Cast.getTableRowCount(table.value);
+    }
+
+    tableContainsItemInCell (args, util) {
+        const table = util.target.lookupOrCreateTable(
+            args.TABLE.id, args.TABLE.name);
+        const item = args.ITEM;
+        const rowIndex = Cast.toTableRowIndex(args.ROW, table.value, false);
+        const columnIndex = Cast.toTableColumnIndex(args.COLUMN, table.value, false);
+        if (rowIndex === Cast.LIST_INVALID || columnIndex === Cast.LIST_INVALID) {
+            return false;
+        }
+        if (table.value[rowIndex - 1] && Array.isArray(table.value[rowIndex - 1])) {
+            const cellValue = table.value[rowIndex - 1][columnIndex - 1];
+            return Cast.compare(cellValue, item) === 0;
+        }
+        return false;
+    }
+
+    tableAsArray (args, util) {
+        const table = util.target.lookupOrCreateTable(
+            args.TABLE.id, args.TABLE.name);
+        return table.value.map(row => {
+            if (Array.isArray(row)) {
+                return row.slice();
+            }
+            return row;
+        });
+    }
+
+    setTableUsingArray (args, util) {
+        const table = util.target.lookupOrCreateTable(
+            args.TABLE.id, args.TABLE.name);
+        const arr = Cast.toArray(args.ARR);
+        table.value = arr.map(item => {
+            if (Array.isArray(item)) {
+                return item.slice();
+            }
+            return [item];
+        });
+        table._monitorUpToDate = false;
+    }
+
+    showTable (args) {
+        this.changeMonitorVisibility(args.TABLE.id, true);
+    }
+
+    hideTable (args) {
+        this.changeMonitorVisibility(args.TABLE.id, false);
     }
 }
 

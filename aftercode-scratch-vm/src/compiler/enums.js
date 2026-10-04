@@ -84,11 +84,20 @@ const InputType = {
     /** Any input that can be interperated as a boolean. Equal to BOOLEAN | STRING_BOOLEAN */
     BOOLEAN_INTERPRETABLE: 0x1800,
 
-    /** Any value type (a type a scratch variable can hold). Equal to NUMBER_OR_NAN | STRING | BOOLEAN */
-    ANY: 0x1FFF,
+    /** Any object. */
+    OBJECT: 0x2000,
+
+    /** Any array. */
+    ARRAY: 0x4000,
+
+    /**
+     * Any value type (a type a scratch variable can hold).
+     * Equal to NUMBER_OR_NAN | STRING | BOOLEAN | OBJECT | ARRAY
+     */
+    ANY: 0x7FFF,
 
     /** An array of values in the form [R, G, B] */
-    COLOR: 0x2000
+    COLOR: 0x8000
 };
 
 /**
@@ -104,6 +113,7 @@ const StackOpcode = {
     VISUAL_REPORT: 'visualReport',
     COMPATIBILITY_LAYER: 'compat',
     OLD_COMPILER_COMPATIBILITY_LAYER: 'oldCompiler',
+    EXT_COMPILED_BLOCK: 'ext.compiledBlock',
 
     HAT_EDGE: 'hat.edge',
     HAT_PREDICATE: 'hat.predicate',
@@ -121,12 +131,29 @@ const StackOpcode = {
     CONTROL_WAIT_UNTIL: 'control.waitUntil',
     CONTROL_CLEAR_COUNTER: 'control.counterClear',
     CONTORL_INCR_COUNTER: 'control.counterIncr',
+    CONTROL_FOREACH_IN_RANGE: 'control.forEachInRange',
+    CONTROL_IF_EXTENDABLE: 'control.ifExtendable',
+    CONTROL_IF_ELSE_EXTENDABLE: 'control.ifElseExtendable',
+    CONTROL_SWITCH: 'control.switch',
+
+    TABLE_ADD: 'table.add',
+    TABLE_INSERT: 'table.insert',
+    TABLE_SET_CELL: 'table.setCell',
+    TABLE_DELETE_CELL: 'table.deleteCell',
+    TABLE_DELETE: 'table.delete',
+    TABLE_DELETE_ALL: 'table.deleteAll',
+    TABLE_SET: 'table.set',
+    TABLE_SHOW: 'table.show',
+    TABLE_HIDE: 'table.hide',
+
+    JSON_FOREACH: 'json.forEach',
 
     LIST_ADD: 'list.add',
     LIST_INSERT: 'list.instert',
     LIST_REPLACE: 'list.replace',
     LIST_DELETE_ALL: 'list.deleteAll',
     LIST_DELETE: 'list.delete',
+    LIST_SETLISTARRAY: 'list.setListArray',
     LIST_SHOW: 'list.show',
     LIST_HIDE: 'list.hide',
 
@@ -178,11 +205,30 @@ const StackOpcode = {
     PEN_SIZE_SET: 'pen.setSize',
     PEN_SIZE_CHANGE: 'pen.changeSize',
     PEN_STAMP: 'pen.stamp',
+    PEN_PRINT: 'pen.print',
+    PEN_PRINT_FONT_SET: 'pen.printSetFont',
+    PEN_PRINT_FONT_SIZE_SET: 'pen.printSetFontSize',
+    PEN_PRINT_COLOR_SET: 'pen.printSetColor',
+    PEN_PRINT_STROKE_WIDTH_SET: 'pen.printSetStrokeWidth',
+    PEN_PRINT_FONT_WEIGHT_SET: 'pen.printSetFontWeight',
+    PEN_PRINT_ITALIC_SET: 'pen.printSetItalic',
+    PEN_PRINT_WORD_WRAP_SET: 'pen.printSetWordWrap',
+    PEN_PRINT_ALIGNMENT_SET: 'pen.printSetAlignment',
+    PEN_PAPER_CLEAR: 'pen.paperClear',
+    PEN_PAPER_CREATE: 'pen.paperCreate',
+    PEN_PAPER_REMOVE: 'pen.paperRemove',
+    PEN_PAPER_COMBINE: 'pen.paperCombine',
+    PEN_PAPER_INDEX_SET: 'pen.paperSetIndex',
+    PEN_PAPER_SWITCH: 'pen.paperSwitch',
+    PEN_PAPER_VISIBILITY_SET: 'pen.paperSetVisibility',
 
     SENSING_TIMER_RESET: 'timer.reset',
+    SENSING_SET_DRAG_MODE: 'sensing.setDragMode',
 
+    PROCEDURE_SET_PARAM: 'procedures.setParam',
     PROCEDURE_RETURN: 'procedures.return',
-    PROCEDURE_CALL: 'procedures.call'
+    PROCEDURE_CALL: 'procedures.call',
+    PROCEDURE_BRANCH: 'procedures.branch'
 };
 
 /**
@@ -201,10 +247,16 @@ const InputOpcode = {
     CAST_NUMBER_OR_NAN: 'cast.toNumberOrNaN',
     CAST_STRING: 'cast.toString',
     CAST_BOOLEAN: 'cast.toBoolean',
+    CAST_OBJECT: 'cast.toObject',
+    CAST_ARRAY: 'cast.toArray',
     CAST_COLOR: 'cast.toColor',
 
     COMPATIBILITY_LAYER: 'compat',
     OLD_COMPILER_COMPATIBILITY_LAYER: 'oldCompiler',
+    EXT_COMPILED_BLOCK: 'ext.compiledBlock',
+
+    CONTROL_INLINE_IF_ELSE: 'control.inlineIfElse',
+    CONTROL_FOREACH_IN_RANGE_ITEM: 'control.forEachInRangeItem',
 
     LOOKS_BACKDROP_NUMBER: 'looks.backdropNumber',
     LOOKS_BACKDROP_NAME: 'looks.backdropName',
@@ -219,10 +271,25 @@ const InputOpcode = {
     LIST_CONTAINS: 'list.contains',
     LIST_INDEX_OF: 'list.indexOf',
     LIST_CONTENTS: 'list.contents',
+    LIST_ASARRAY: 'list.asArray',
+
+    TABLE_CELL_VALUE: 'table.cellValue',
+    TABLE_DIMENSION_VALUES: 'table.dimensionValues',
+    TABLE_DIMENSION_LENGTH: 'table.dimensionLength',
+    TABLE_DIMENSION_COUNT: 'table.dimensionCount',
+    TABLE_CONTAINS_VALUE: 'table.containsValue',
+    TABLE_AS_ARRAY: 'table.asArray',
+    TABLE_CONTENTS: 'table.contents',
 
     MOTION_X_GET: 'motion.x',
     MOTION_Y_GET: 'motion.y',
     MOTION_DIRECTION_GET: 'motion.direction',
+
+    PEN_PAPER_EXISTS: 'pen.paperExists',
+    PEN_PAPERS: 'pen.papers',
+    PEN_PAPER_INDEX: 'pen.paperIndex',
+    PEN_CURRENT_PAPER: 'pen.currentPaper',
+    PEN_PAPER_VISIBLE: 'pen.paperVisible',
 
     OP_ADD: 'op.add',
     OP_AND: 'op.and',
@@ -234,6 +301,7 @@ const InputOpcode = {
     OP_JOIN: 'op.join',
     OP_LENGTH: 'op.length',
     OP_LETTER_OF: 'op.letterOf',
+    OP_LETTERS_IN: 'op.lettersIn',
     OP_ABS: 'op.abs',
     OP_FLOOR: 'op.floor',
     OP_CEILING: 'op.ceiling',
@@ -255,9 +323,26 @@ const InputOpcode = {
     OP_RANDOM: 'op.random',
     OP_ROUND: 'op.round',
     OP_SUBTRACT: 'op.subtract',
+    OP_TYPEOF: 'op.typeof',
+    OP_ADD_EXTENDABLE: 'op.add_extendable',
+    OP_SUBTRACT_EXTENDABLE: 'op.subtract_extendable',
+    OP_MULTIPLY_EXTENDABLE: 'op.multiply_extendable',
+    OP_DIVIDE_EXTENDABLE: 'op.divide_extendable',
+    OP_POWER: 'op.power',
+    OP_AND_EXTENDABLE: 'op.and_extendable',
+    OP_OR_EXTENDABLE: 'op.or_extendable',
+    OP_XOR_EXTENDABLE: 'op.xor_extendable',
+    OP_JOIN_EXTENDABLE: 'op.join_extendable',
+    OP_LESS_EXTENDABLE: 'op.less_extendable',
+    OP_EQUALS_EXTENDABLE: 'op.equals_extendable',
+    OP_GREATER_EXTENDABLE: 'op.greater_extendable',
+    OP_LESS_OR_EQUAL_EXTENDABLE: 'op.less_or_equal_extendable',
+    OP_GREATER_OR_EQUAL_EXTENDABLE: 'op.greater_or_equal_extendable',
 
     SENSING_ANSWER: 'sensing.answer',
     SENSING_COLOR_TOUCHING_COLOR: 'sensing.colorTouchingColor',
+    SENSING_LOUDNESS: 'sensing.loudness',
+    SENSING_LOUD: 'sensing.loud',
     SENSING_TIME_YEAR: 'sensing.year',
     SENSING_TIME_MONTH: 'sensing.month',
     SENSING_TIME_DATE: 'sensing.date',
@@ -265,6 +350,8 @@ const InputOpcode = {
     SENSING_TIME_HOUR: 'sensing.hour',
     SENSING_TIME_MINUTE: 'sensing.minute',
     SENSING_TIME_SECOND: 'sensing.second',
+    SENSING_TIME_MILLISECOND: 'sensing.millisecond',
+    SENSING_TIME_TIMESTAMP: 'sensing.timestamp',
     SENSING_TIME_DAYS_SINCE_2000: 'sensing.daysSince2000',
     SENSING_DISTANCE: 'sensing.distance',
     SENSING_KEY_DOWN: 'keyboard.pressed',
@@ -286,6 +373,43 @@ const InputOpcode = {
     SENSING_TOUCHING_COLOR: 'sensing.touchingColor',
     SENSING_TOUCHING_OBJECT: 'sensing.touching',
     SENSING_USERNAME: 'sensing.username',
+    SENSING_ONLINE: 'sensing.online',
+
+    SOUND_VOLUME: 'sound.volume',
+
+    JSON_NEW_OBJECT: 'json.newObject',
+    JSON_OBJECT: 'json.objectExtendable',
+    JSON_GET_PROPERTIES: 'json.getProperties',
+    JSON_VALUE_OF_KEY: 'json.valueOfKey',
+    JSON_SET_KEY: 'json.setKey',
+    JSON_DELETE_KEY: 'json.deleteKey',
+    JSON_MERGE_OBJECT: 'json.mergeObject',
+    JSON_HAS_KEY: 'json.hasKey',
+    JSON_NEW_ARRAY: 'json.newArray',
+    JSON_ARRAY: 'json.arrayExtendable',
+    JSON_VALUE_OF_INDEX: 'json.valueOfIndex',
+    JSON_INDEX_OF_VALUE: 'json.indexOfValue',
+    JSON_ADD_ITEM: 'json.addItem',
+    JSON_REPLACE_INDEX: 'json.replaceIndex',
+    JSON_DELETE_INDEX: 'json.deleteIndex',
+    JSON_DELETE_ALL_OCCURRENCES: 'json.deleteAllOccurrences',
+    JSON_MERGE_ARRAY: 'json.mergeArray',
+    JSON_HAS_ITEM: 'json.hasItem',
+    JSON_ARRAY_LENGTH: 'json.arrayLength',
+    JSON_SLICE_ARRAY: 'json.sliceArray',
+    JSON_REVERSE_ARRAY: 'json.reverseArray',
+    JSON_FOREACH_VALUE: 'json.forEachValue',
+    JSON_FOREACH_INDEX: 'json.forEachIndex',
+    JSON_MAP: 'json.map',
+    JSON_MAP_VALUE: 'json.mapValue',
+    JSON_MAP_INDEX: 'json.mapIndex',
+    JSON_FILTER: 'json.filter',
+    JSON_FILTER_VALUE: 'json.filterValue',
+    JSON_FILTER_INDEX: 'json.filterIndex',
+    JSON_SORT: 'json.sort',
+    JSON_SORT_A: 'json.sortA',
+    JSON_SORT_B: 'json.sortB',
+    JSON_SPLIT: 'json.split',
 
     PROCEDURE_CALL: 'procedures.call',
     PROCEDURE_ARGUMENT: 'procedures.argument',

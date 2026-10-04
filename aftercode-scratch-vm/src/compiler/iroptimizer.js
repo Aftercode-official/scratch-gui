@@ -155,8 +155,21 @@ class IROptimizer {
         case InputOpcode.VAR_GET:
             return state.getVariableType(inputs.variable);
 
+        case InputOpcode.EXT_COMPILED_BLOCK:
         case InputOpcode.ADDON_CALL:
             break;
+
+        case InputOpcode.CAST_OBJECT: {
+            const innerType = inputs.target.type;
+            if (innerType & InputType.OBJECT) return innerType;
+            return InputType.OBJECT;
+        }
+
+        case InputOpcode.CAST_ARRAY: {
+            const innerType = inputs.target.type;
+            if (innerType & InputType.ARRAY) return innerType;
+            return InputType.ARRAY;
+        }
 
         case InputOpcode.CAST_BOOLEAN: {
             const innerType = inputs.target.type;
@@ -509,6 +522,7 @@ class IROptimizer {
         inputBlock.type = newType;
 
         switch (inputBlock.opcode) {
+        case InputOpcode.EXT_COMPILED_BLOCK:
         case InputOpcode.ADDON_CALL:
             modified = state.clear() || modified;
             break;
@@ -599,6 +613,7 @@ class IROptimizer {
             this.addPossibleExitState(state);
             break;
         }
+        case StackOpcode.EXT_COMPILED_BLOCK:
         case StackOpcode.CONTROL_WAIT_UNTIL: {
             modified = state.clear() || modified;
             modified = this.analyzeInputs(inputs, state) || modified;
@@ -723,6 +738,22 @@ class IROptimizer {
         }
 
         switch (input.opcode) {
+        case InputOpcode.CAST_OBJECT: {
+            const targetType = input.inputs.target.type;
+            if ((targetType & InputType.OBJECT) === targetType) {
+                return input.inputs.target;
+            }
+            return input;
+        }
+
+        case InputOpcode.CAST_ARRAY: {
+            const targetType = input.inputs.target.type;
+            if ((targetType & InputType.ARRAY) === targetType) {
+                return input.inputs.target;
+            }
+            return input;
+        }
+
         case InputOpcode.CAST_BOOLEAN: {
             const targetType = input.inputs.target.type;
             if ((targetType & InputType.BOOLEAN) === targetType) {

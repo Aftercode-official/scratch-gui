@@ -9,6 +9,11 @@ const ArgumentType = {
     ANGLE: 'angle',
 
     /**
+     * Numeric value with a slider picker
+     */
+    SLIDER: 'slider',
+
+    /**
      * Boolean value with hexagonal placeholder
      */
     BOOLEAN: 'Boolean',
@@ -27,6 +32,16 @@ const ArgumentType = {
      * String value with text field
      */
     STRING: 'string',
+
+    /**
+     * Object value with object shaped placeholder.
+     */
+    OBJECT: 'Object',
+
+    /**
+     * Array value with array shaped placeholder.
+     */
+    ARRAY: 'Array',
 
     /**
      * String value with matrix field
@@ -51,7 +66,32 @@ const ArgumentType = {
     /**
      * Name of sound in the current target
      */
-    SOUND: 'sound'
+    SOUND: 'sound',
+
+    /**
+     * Name of scalar variable in the current scope
+     */
+    VARIABLE: 'variable',
+
+    /**
+     * Name of list variable in the current scope
+     */
+    LIST: 'list',
+
+    /**
+     * Name of table variable in the current scope
+     */
+    TABLE: 'table',
+
+    /**
+     * Name of broadcast message in the current scope
+     */
+    BROADCAST: 'broadcast',
+
+    /**
+     * Name of extendable field
+    */
+    EXTENDABLE: 'extendable'
 };
 
 module.exports = ArgumentType;

@@ -2,6 +2,7 @@ const RenderedTarget = require('./rendered-target');
 const Blocks = require('../engine/blocks');
 const {loadSoundFromAsset} = require('../import/load-sound');
 const {loadCostumeFromAsset} = require('../import/load-costume');
+const {loadAsset} = require('../import/load-asset');
 const newBlockIds = require('../util/new-block-ids');
 const StringUtil = require('../util/string-util');
 const StageLayering = require('../engine/stage-layering');
@@ -44,6 +45,10 @@ class Sprite {
          * List of sounds for this sprite.
         */
         this.sounds = [];
+        /**
+         * List of assets for this sprite.
+         */
+        this.assets = [];
         /**
          * List of clones for this sprite, including the original.
          * @type {Array.<!RenderedTarget>}
@@ -140,7 +145,7 @@ class Sprite {
         const blocksContainer = this.blocks._blocks;
         const originalBlocks = Object.keys(blocksContainer).map(key => blocksContainer[key]);
         const copiedBlocks = JSON.parse(JSON.stringify(originalBlocks));
-        newBlockIds(copiedBlocks);
+        newSprite._duplicateBlockIdMap = newBlockIds(copiedBlocks);
         copiedBlocks.forEach(block => {
             newSprite.blocks.createBlock(block);
         });
@@ -162,6 +167,12 @@ class Sprite {
             const soundAsset = sound.asset;
             assetPromises.push(loadSoundFromAsset(newSound, soundAsset, this.runtime, newSprite.soundBank));
             return newSound;
+        });
+
+        newSprite.assets = this.assets.map(asset => {
+            const newAsset = Object.assign({}, asset);
+            assetPromises.push(loadAsset(newAsset, this.runtime));
+            return newAsset;
         });
 
         return Promise.all(assetPromises).then(() => newSprite);

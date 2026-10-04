@@ -32,13 +32,19 @@ class Scratch3ControlBlocks {
             control_wait_until: this.waitUntil,
             control_if: this.if,
             control_if_else: this.ifElse,
+            control_if_extendable: this.ifExtendable,
+            control_if_else_extendable: this.ifElseExtendable,
+            control_inline_if_else: this.inlineIfElse,
+            control_switch: this.switch,
             control_stop: this.stop,
             control_create_clone_of: this.createClone,
             control_delete_this_clone: this.deleteClone,
             control_get_counter: this.getCounter,
             control_incr_counter: this.incrCounter,
             control_clear_counter: this.clearCounter,
-            control_all_at_once: this.allAtOnce
+            control_all_at_once: this.allAtOnce,
+            control_foreach_in_range: this.forEachInRange,
+            control_foreach_in_range_item: this.forEachInRangeItem
         };
     }
 
@@ -137,6 +143,43 @@ class Scratch3ControlBlocks {
         }
     }
 
+    ifExtendable (args, util) {
+        const argCount = args.BRANCHES;
+        for (let i = 0; i < argCount; i++) {
+            if (Cast.toBoolean(args[`BRANCHES_${i}_CONDITION`])) {
+                util.startBranch(`BRANCHES_${i}_BRANCH`);
+                return;
+            }
+        }
+    }
+
+    ifElseExtendable (args, util) {
+        const argCount = args.BRANCHES;
+        for (let i = 0; i < argCount; i++) {
+            if (Cast.toBoolean(args[`BRANCHES_${i}_CONDITION`])) {
+                util.startBranch(`BRANCHES_${i}_BRANCH`, false);
+                return;
+            }
+        }
+        util.startBranch(`ELSE_BRANCH`, false);
+    }
+
+    inlineIfElse (args) {
+        return Cast.toBoolean(args.OPERAND) ? args.THEN : args.ELSE;
+    }
+
+    switch (args, util) {
+        const switchVal = Cast.toString(args.SWITCH);
+        const caseCount = args.CASES;
+        for (let i = 0; i < caseCount; i++) {
+            if (switchVal === Cast.toString(args[`CASES_${i}_CASE`])) {
+                util.startBranch(`CASES_${i}_BRANCH`, false);
+                return;
+            }
+        }
+        util.startBranch(`DEFAULT_BRANCH`, false);
+    }
+
     stop (args, util) {
         const option = args.STOP_OPTION;
         if (option === 'all') {
@@ -200,6 +243,43 @@ class Scratch3ControlBlocks {
         // "run without screen refresh" custom blocks do now, but this was
         // removed before the release of 2.0.)
         util.startBranch(1, false);
+    }
+
+    forEachInRangeItem (args, util) {
+        const frames = util.thread.stackFrames;
+        for (let i = frames.length - 1; i >= 0; i--) {
+            if (typeof frames[i].forEachInRangeItem !== 'undefined') {
+                return frames[i].forEachInRangeItem ?? 0;
+            }
+        }
+        return 0;
+    }
+
+    forEachInRange (args, util) {
+        const {stackFrame} = util;
+
+        if (typeof stackFrame.index === 'undefined') {
+            const from = Math.round(Cast.toNumber(args.FROM));
+            const to = Math.round(Cast.toNumber(args.TO));
+            Object.assign(stackFrame, {
+                from,
+                to,
+                step: from <= to ? 1 : -1,
+                index: from
+            });
+        }
+
+        const {index, to, step} = stackFrame;
+        const done = step > 0 ? index > to : index < to;
+
+        if (done) {
+            delete stackFrame.forEachInRangeItem;
+            return;
+        }
+
+        stackFrame.forEachInRangeItem = index;
+        stackFrame.index += step;
+        util.startBranch(1, true);
     }
 }
 

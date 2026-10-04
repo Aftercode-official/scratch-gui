@@ -15,6 +15,7 @@ const defaultBuiltinExtensions = {
     coreExample: () => require('../blocks/scratch3_core_example'),
     // These are the non-core built-in extensions.
     pen: () => require('../extensions/scratch3_pen'),
+    camera: () => require('../extensions/nitrobolt_camera'),
     wedo2: () => require('../extensions/scratch3_wedo2'),
     music: () => require('../extensions/scratch3_music'),
     microbit: () => require('../extensions/scratch3_microbit'),
@@ -27,7 +28,22 @@ const defaultBuiltinExtensions = {
     gdxfor: () => require('../extensions/scratch3_gdx_for'),
     // tw: core extension
     tw: () => require('../extensions/tw'),
+    // nb: debugger extension
+    debugger: () => require('../extensions/nitrobolt_debugger')
 };
+
+const coreExtensions = [
+    'motion',
+    'looks',
+    'sound',
+    'events',
+    'control',
+    'sensing',
+    'operators',
+    'data',
+    'json',
+    'procedures'
+];
 
 /**
  * @typedef {object} ArgumentInfo - Information about an extension block argument
@@ -126,6 +142,7 @@ class ExtensionManager {
         this.asyncExtensionsLoadedCallbacks = [];
 
         this.builtinExtensions = Object.assign({}, defaultBuiltinExtensions);
+        this.coreExtensions = coreExtensions;
 
         dispatch.setService('extensions', createExtensionService(this)).catch(e => {
             log.error(`ExtensionManager was unable to register extension service: ${JSON.stringify(e)}`);
@@ -143,68 +160,6 @@ class ExtensionManager {
         return this._loadedExtensions.has(extensionID);
     }
 
-    unloadExtension (extensionId) {
-        if (this.isBuiltinExtension(extensionId)) {
-            throw new Error(`Cannot unload built-in extension: ${extensionId}`);
-        }
-        const serviceName = this._loadedExtensions.get(extensionId);
-        if (!serviceName) {
-            throw new Error(`Unknown extension: ${extensionId}`);
-        }
-
-        this._removeExtensionBlocks(extensionId);
-        this._loadedExtensions.delete(extensionId);
-        if (!Array.from(this._loadedExtensions.values()).includes(serviceName)) {
-            const workerId = +serviceName.split('.')[1];
-            delete this.workerURLs[workerId];
-            dispatch.removeServiceSync(serviceName);
-        }
-        dispatch.callSync('runtime', '_removeExtensionPrimitives', extensionId);
-    }
-
-    _removeExtensionBlocks (extensionId) {
-        const opcodePrefix = `${extensionId}_`;
-        this.runtime.targets.forEach(target => {
-            const blocks = target.blocks;
-            const extensionBlockIds = Object.keys(blocks._blocks).filter(blockId => {
-                const block = blocks._blocks[blockId];
-                return block.opcode && block.opcode.indexOf(opcodePrefix) === 0;
-            });
-
-            extensionBlockIds.forEach(blockId => {
-                const block = blocks._blocks[blockId];
-                if (!block || block.parent === null) {
-                    blocks.deleteBlock(blockId);
-                    return;
-                }
-
-                const parent = blocks._blocks[block.parent];
-                if (parent) {
-                    if (parent.next === blockId) {
-                        parent.next = block.next;
-                        if (block.next && blocks._blocks[block.next]) {
-                            blocks._blocks[block.next].parent = block.parent;
-                        }
-                    }
-                    Object.keys(parent.inputs).forEach(inputName => {
-                        const input = parent.inputs[inputName];
-                        if (input.block === blockId) input.block = null;
-                        if (input.shadow === blockId) input.shadow = null;
-                    });
-                }
-
-                block.next = null;
-                blocks.deleteBlock(blockId);
-            });
-        });
-    }
-
-    unloadAllExtensions () {
-        Array.from(this._loadedExtensions.keys())
-            .filter(extensionId => !this.isBuiltinExtension(extensionId))
-            .forEach(extensionId => this.unloadExtension(extensionId));
-    }
-
     /**
      * Determine whether an extension with a given ID is built in to the VM, such as pen.
      * Note that "core extensions" like motion will return false here.
@@ -213,6 +168,16 @@ class ExtensionManager {
      */
     isBuiltinExtension (extensionId) {
         return Object.prototype.hasOwnProperty.call(this.builtinExtensions, extensionId);
+    }
+
+    /**
+     * Determine whether an extension with a given ID is registered as a core extension in the VM, such as motion.
+     * Note that custom extensions or extensions that don't load on startup will return false here.
+     * @param {string} extensionId
+     * @returns {boolean}
+     */
+    isCoreExtension (extensionId) {
+        return this.coreExtensions.includes(extensionId);
     }
 
     /**
@@ -269,8 +234,8 @@ class ExtensionManager {
             return;
         }
 
-        if (this.isExtensionURLLoaded(extensionURL)) {
-            // Extension is already loaded.
+        if (this.isExtensionURLLoaded(extensionURL) || this.isCoreExtension(extensionURL)) {
+            // Extension is already loaded or is a core extension.
             return;
         }
 
@@ -319,6 +284,47 @@ class ExtensionManager {
             this.pendingExtensions.push({extensionURL: rewritten, resolve, reject});
             dispatch.addWorker(new ExtensionWorker());
         }).catch(error => this._failedLoadingExtensionScript(error));
+    }
+
+    /**
+     * Reorder an extension by using current index and reorder to index
+     * @param {string} extensionIndex - the index of the extension to reorder
+     * @param {string} reorderIndex - the index to reorder the extension to
+     * @returns {Promise} resolved once the extension is loaded and initialized or rejected on failure
+     */
+    reorderExtension (extensionIndex, reorderIndex) {
+        const extensions = Array.from(this._loadedExtensions);
+        if (reorderIndex >= extensions.length) {
+            let padding = reorderIndex - extensions.length + 1;
+            while (padding--) {
+                extensions.push(null);
+            }
+        }
+        extensions.splice(reorderIndex, 0, extensions.splice(extensionIndex, 1)[0]);
+        this._loadedExtensions = new Map(extensions.map(extension => [extension[0], extension[1]]));
+        dispatch.call('runtime', '_reorderExtensionPrimitive', extensionIndex, reorderIndex);
+        this.refreshBlocks();
+    }
+
+    /**
+     * Unload an extension by URL or internal extension ID
+     * @param {string} extensionURL - the URL for the extension to load OR the ID of an internal extension
+     * @returns {Promise} resolved once the extension is loaded and initialized or rejected on failure
+     */
+    removeExtension (extensionURL) {
+        if (!this.isExtensionLoaded(extensionURL)) {
+            const message = `Rejecting attempt to remove an unloaded extension with ID ${extensionURL}`;
+            log.warn(message);
+            return;
+        }
+        const serviceName = this._loadedExtensions.get(extensionURL);
+        delete dispatch.services[serviceName];
+        delete this.runtime[`ext_${extensionURL}`];
+        this._loadedExtensions.delete(extensionURL);
+        const workerId = +serviceName.split('.')[1];
+        delete this.workerURLs[workerId];
+        dispatch.call('runtime', '_removeExtensionPrimitive', extensionURL);
+        this.refreshBlocks();
     }
 
     /**
@@ -504,7 +510,7 @@ class ExtensionManager {
 
             // If the menu description is in short form (items only) then normalize it to general form: an object with
             // its items listed in an `items` property.
-            if (!menuInfo.items) {
+            if (!menuInfo.items && !menuInfo.optionMapping) {
                 menuInfo = {
                     items: menuInfo
                 };
@@ -541,6 +547,9 @@ class ExtensionManager {
         const menuItems = menuFunc.call(extensionObject, editingTargetID).map(
             item => {
                 item = maybeFormatMessage(item, extensionMessageContext);
+                if (item === '---') {
+                    return 'separator';
+                }
                 switch (typeof item) {
                 case 'object':
                     return [
@@ -581,6 +590,26 @@ class ExtensionManager {
             arguments: {}
         }, blockInfo);
         blockInfo.text = blockInfo.text || blockInfo.opcode;
+
+        if (typeof blockInfo.blockType === 'function' && typeof blockInfo.blockType.shape !== 'undefined') {
+            blockInfo.blockShape = blockInfo.blockType.shape;
+            blockInfo.blockType = BlockType.REPORTER;
+        }
+
+        if (typeof blockInfo.dualType !== 'undefined') {
+            const validDualTypes = [
+                BlockType.REPORTER,
+                BlockType.BOOLEAN,
+                BlockType.OBJECT,
+                BlockType.ARRAY
+            ];
+            if (blockInfo.blockType !== BlockType.COMMAND) {
+                throw new Error('The dualType property is only supported on command blocks');
+            }
+            if (!validDualTypes.includes(blockInfo.dualType)) {
+                throw new Error(`Invalid dual reporter type: ${blockInfo.dualType}`);
+            }
+        }
 
         switch (blockInfo.blockType) {
         case BlockType.EVENT:
@@ -647,6 +676,26 @@ class ExtensionManager {
             };
             break;
         }
+        }
+
+        if (blockInfo.func && blockInfo.arguments) {
+            const customTypeArgs = {};
+            for (const name in blockInfo.arguments) {
+                const arg = blockInfo.arguments[name];
+                if (typeof arg.type === 'function' && typeof arg.type.shape !== 'function') {
+                    customTypeArgs[name] = arg.type;
+                }
+            }
+            if (Object.keys(customTypeArgs).length > 0) {
+                const originalFunc = blockInfo.func;
+                blockInfo.func = (args, util) => {
+                    const wrappedArgs = Object.assign({}, args);
+                    for (const name in customTypeArgs) {
+                        wrappedArgs[name] = new customTypeArgs[name](wrappedArgs[name]);
+                    }
+                    return originalFunc(wrappedArgs, util);
+                };
+            }
         }
 
         return blockInfo;

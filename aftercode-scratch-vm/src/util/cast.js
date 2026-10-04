@@ -92,7 +92,55 @@ class Cast {
      * @return {string} The Scratch-casted string value.
      */
     static toString (value) {
+        if (typeof value === 'undefined' || value === null) {
+            return String();
+        } else if (typeof value === 'object') {
+            try {
+                return JSON.stringify(value);
+            } catch (e) {
+                // Think fast, chucklenuts!
+            }
+        }
         return String(value);
+    }
+
+    /**
+     * Scratch cast to object.
+     * @param {*} value Value to cast to object.
+     * @param {?boolean} [nullSafe] Is null allowed.
+     * @return {object} The Scratch-casted object value.
+     */
+    static toObject (value, nullSafe) {
+        if (typeof value === 'object') {
+            if (value === null) {
+                if (nullSafe) return null;
+                return new Object();
+            }
+            if (Array.isArray(value)) return new Object();
+            return value;
+        }
+        try {
+            return Cast.toObject(JSON.parse(value));
+        } catch {
+            return new Object();
+        }
+    }
+
+    /**
+     * Scratch cast to array.
+     * @param {*} value Value to cast to array.
+     * @return {array} The Scratch-casted array value.
+     */
+    static toArray (value) {
+        if (Array.isArray(value)) return value;
+        try {
+            if (typeof value === 'string') {
+                return Cast.toArray(JSON.parse(value));
+            }
+            return Array.from(value);
+        } catch {
+            return new Array();
+        }
     }
 
     /**
@@ -121,6 +169,16 @@ class Cast {
             color = Color.decimalToRgb(Cast.toNumber(value));
         }
         return color;
+    }
+
+    /**
+     * Scratch cast to Float32Array.
+     * @param {*} value Value to cast to Float32Array.
+     * @return {Float32Array} The casted Float32Array value.
+     */
+    static toFloat32Array (value) {
+        if (value instanceof Float32Array) return value;
+        return new Float32Array(Cast.toArray(value));
     }
 
     /**
@@ -233,6 +291,79 @@ class Cast {
             return Cast.LIST_INVALID;
         }
         return index;
+    }
+
+    /**
+     * Compute a 0-based index into an array, based on a block argument.
+     * Returns Cast.LIST_INVALID if the index was invalid in any way.
+     * @param {*} index Arg, including 0-based numbers or special cases ("last", "random").
+     * @param {number} length Length of the array.
+     * @return {(number|string)} 0-based index for array, or LIST_INVALID.
+     */
+    static toArrayIndex (index, length) {
+        if (typeof index !== 'number') {
+            if (index === 'last') {
+                if (length > 0) {
+                    return length - 1;
+                }
+                return Cast.LIST_INVALID;
+            } else if (index === 'random') {
+                if (length > 0) {
+                    return Math.floor(Math.random() * length);
+                }
+                return Cast.LIST_INVALID;
+            }
+        }
+        index = Math.floor(Cast.toNumber(index));
+        if (index < 0 || index >= length) {
+            return Cast.LIST_INVALID;
+        }
+        return index;
+    }
+
+    /**
+     * Get the number of rows in a table.
+     * @param {Array} table The table value array.
+     * @return {number} Number of rows in the table.
+     */
+    static getTableRowCount (table) {
+        return Array.isArray(table) ? table.length : 0;
+    }
+
+    /**
+     * Get the number of columns in a table (from the first row).
+     * @param {Array} table The table value array.
+     * @return {number} Number of columns in the table.
+     */
+    static getTableColumnCount (table) {
+        if (!Array.isArray(table) || table.length === 0) {
+            return 0;
+        }
+        return Array.isArray(table[0]) ? table[0].length : 0;
+    }
+
+    /**
+     * Compute a 1-based row index into a table, based on a Scratch argument.
+     * @param {*} index Scratch arg, including 1-based numbers or special cases.
+     * @param {Array} table The table value array.
+     * @param {boolean} acceptAll Whether it should accept "all" or not.
+     * @return {(number|string)} 1-based index for table row, LIST_ALL, or LIST_INVALID.
+     */
+    static toTableRowIndex (index, table, acceptAll) {
+        const rowCount = Cast.getTableRowCount(table);
+        return Cast.toListIndex(index, rowCount, acceptAll);
+    }
+
+    /**
+     * Compute a 1-based column index into a table, based on a Scratch argument.
+     * @param {*} index Scratch arg, including 1-based numbers or special cases.
+     * @param {Array} table The table value array.
+     * @param {boolean} acceptAll Whether it should accept "all" or not.
+     * @return {(number|string)} 1-based index for table column, LIST_ALL, or LIST_INVALID.
+     */
+    static toTableColumnIndex (index, table, acceptAll) {
+        const columnCount = Cast.getTableColumnCount(table);
+        return Cast.toListIndex(index, columnCount, acceptAll);
     }
 }
 

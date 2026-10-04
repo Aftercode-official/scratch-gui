@@ -3,6 +3,7 @@ const EventEmitter = require('events');
 const Blocks = require('./blocks');
 const Variable = require('../engine/variable');
 const Comment = require('../engine/comment');
+const Group = require('../engine/group');
 const uid = require('../util/uid');
 const log = require('../util/log');
 const StringUtil = require('../util/string-util');
@@ -39,6 +40,12 @@ class Target extends EventEmitter {
          */
         this.id = uid();
         /**
+         * ID of the folder containing this target, or null when the
+         * target is not in a folder. Only original, non-stage targets use it.
+         * @type {?string}
+         */
+        this.folderId = null;
+        /**
          * Blocks run as code for this target.
          * @type {!Blocks}
          */
@@ -55,6 +62,11 @@ class Target extends EventEmitter {
          * @type {Object.<string,*>}
          */
         this.comments = {};
+        /**
+         * Dictionary of groups for this target.
+         * Key is the group id.
+         */
+        this.groups = {};
         /**
          * Dictionary of custom state for this target.
          * This can be used to store target-specific custom state for blocks which need it.
@@ -260,6 +272,26 @@ class Target extends EventEmitter {
     }
 
     /**
+    * Look up a table object for this target, and create it if one doesn't exist.
+    * Search begins for local tables; then look for globals.
+    * @param {!string} id Id of the table.
+    * @param {!string} name Name of the table.
+    * @return {!Varible} Variable object representing the found/created table.
+     */
+    lookupOrCreateTable (id, name) {
+        let table = this.lookupVariableById(id);
+        if (table) return table;
+
+        table = this.lookupVariableByNameAndType(name, Variable.TABLE_TYPE);
+        if (table) return table;
+
+        // No variable with this name exists - create it locally.
+        const newTable = new Variable(id, name, Variable.TABLE_TYPE, false);
+        this.variables[id] = newTable;
+        return newTable;
+    }
+
+    /**
      * Creates a variable with the given id and name and adds it to the
      * dictionary of variables.
      * @param {string} id Id of variable
@@ -292,10 +324,10 @@ class Target extends EventEmitter {
      * @param {number} height The height of the comment when it is full size
      * @param {boolean} minimized Whether the comment is minimized.
      */
-    createComment (id, blockId, text, x, y, width, height, minimized) {
+    createComment (id, blockId, text, x, y, width, height, minimized, colour) {
         if (!Object.prototype.hasOwnProperty.call(this.comments, id)) {
             const newComment = new Comment(id, text, x, y,
-                width, height, minimized);
+                width, height, minimized, colour);
             if (blockId) {
                 newComment.blockId = blockId;
                 const blockWithComment = this.blocks.getBlock(blockId);
@@ -308,6 +340,14 @@ class Target extends EventEmitter {
             }
             this.comments[id] = newComment;
         }
+    }
+
+    /**
+     * Create or replace an editor script group.
+     */
+    createGroup (state) {
+        const group = new Group(state);
+        this.groups[group.id] = group;
     }
 
     /**
@@ -342,11 +382,23 @@ class Target extends EventEmitter {
                         if (blockUpdated) this.runtime.requestBlocksUpdate();
                     }
 
+                    let name;
+                    switch (variable.type) {
+                    case Variable.TABLE_TYPE:
+                        name = 'TABLE';
+                        break;
+                    case Variable.LIST_TYPE:
+                        name = 'LIST';
+                        break;
+                    default:
+                        name = 'VARIABLE';
+                        break;
+                    }
                     const blocks = this.runtime.monitorBlocks;
                     blocks.changeBlock({
                         id: id,
                         element: 'field',
-                        name: variable.type === Variable.LIST_TYPE ? 'LIST' : 'VARIABLE',
+                        name,
                         value: id
                     }, this.runtime);
                     const monitorBlock = blocks.getBlock(variable.id);
@@ -422,6 +474,8 @@ class Target extends EventEmitter {
                 originalVariable.isCloud
             );
             if (newVariable.type === Variable.LIST_TYPE) {
+                newVariable.value = originalVariable.value.slice(0);
+            } else if (newVariable.type === Variable.TABLE_TYPE) {
                 newVariable.value = originalVariable.value.slice(0);
             } else {
                 newVariable.value = originalVariable.value;

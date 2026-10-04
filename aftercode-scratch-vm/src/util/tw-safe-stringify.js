@@ -17,8 +17,16 @@ const circularReplacer = () => {
  * @returns {string} A stringified version of the input.
  */
 const safeStringify = input => {
-    if (typeof input === 'object' && input !== null) {
-        return JSON.stringify(input, circularReplacer());
+    if (input !== null) {
+        if (input instanceof Float32Array) {
+            return JSON.stringify(
+                Array.from(input, v => (isFinite(v) ? v : v.toString())),
+                circularReplacer()
+            );
+        }
+        if (typeof input === 'object') {
+            return JSON.stringify(input, circularReplacer());
+        }
     }
     // -0 stringifies as "0" by default.
     if (Object.is(input, -0)) {

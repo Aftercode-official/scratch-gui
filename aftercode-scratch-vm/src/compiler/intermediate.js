@@ -60,6 +60,9 @@ class IntermediateStackBlock {
  */
 class IntermediateInput {
 
+    /**
+     * @param {number} number
+     */
     static getNumberInputType (number) {
         if (typeof number !== 'number') throw new Error('Expected a number.');
         if (number === Infinity) return InputType.NUMBER_POS_INF;
@@ -89,7 +92,7 @@ class IntermediateInput {
         this.type = type;
 
         /**
-         * @type {Object}
+         * @type {Record<string, any>}
          */
         this.inputs = inputs;
 
@@ -157,6 +160,12 @@ class IntermediateInput {
         case InputType.COLOR:
             castOpcode = InputOpcode.CAST_COLOR;
             break;
+        case InputType.OBJECT:
+            castOpcode = InputOpcode.CAST_OBJECT;
+            break;
+        case InputType.ARRAY:
+            castOpcode = InputOpcode.CAST_ARRAY;
+            break;
         default:
             log.warn(`Cannot cast to type: ${targetType}`, this);
             throw new Error(`Cannot cast to type: ${targetType}`);
@@ -200,6 +209,14 @@ class IntermediateInput {
             case InputOpcode.CAST_COLOR:
                 this.inputs.value = Cast.toRgbColorList(this.inputs.value);
                 this.type = InputType.COLOR;
+                break;
+            case InputOpcode.CAST_OBJECT:
+                this.inputs.value = Cast.toObject(this.inputs.value);
+                this.type = InputType.OBJECT;
+                break;
+            case InputOpcode.CAST_ARRAY:
+                this.inputs.value = Cast.toArray(this.inputs.value);
+                this.type = InputType.ARRAY;
                 break;
             }
             return this;
@@ -274,6 +291,12 @@ class IntermediateScript {
          * @type {string?}
          */
         this.topBlockId = null;
+
+        /**
+         * The ID of the bottom block of this script.
+         * @type {string?}
+         */
+        this.bottomBlockId = null;
 
         /**
          * List of nodes that make up this script.

@@ -52,6 +52,16 @@ const BlockType = {
     REPORTER: 'reporter',
 
     /**
+     * Object Shaped Block that returns pure Objects
+     */
+    OBJECT: 'Object',
+
+    /**
+     * Array Shaped Block that returns pure Arrays.
+     */
+    ARRAY: 'Array',
+
+    /**
      * Arbitrary scratch-blocks XML.
      */
     XML: 'xml'

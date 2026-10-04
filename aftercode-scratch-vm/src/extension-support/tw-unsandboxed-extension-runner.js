@@ -35,6 +35,7 @@ const setupUnsandboxedExtensionAPI = vm => new Promise(resolve => {
     const Scratch = Object.assign({}, global.Scratch || {}, ScratchCommon);
     Scratch.extensions = {
         unsandboxed: true,
+        isNitroBolt: true,
         register
     };
     Scratch.vm = vm;

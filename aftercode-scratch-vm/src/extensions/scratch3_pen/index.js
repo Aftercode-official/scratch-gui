@@ -28,6 +28,16 @@ const ColorParam = {
     TRANSPARENCY: 'transparency'
 };
 
+const BUILT_IN_PRINT_FONTS = [
+    'Sans Serif',
+    'Serif',
+    'Handwriting',
+    'Marker',
+    'Curly',
+    'Pixel',
+    'Scratch'
+];
+
 /**
  * @typedef {object} PenState - the pen state associated with a particular target.
  * @property {Boolean} penDown - tracks whether the pen should draw for this target.
@@ -63,11 +73,29 @@ class Scratch3PenBlocks {
          */
         this._penSkinId = -1;
 
+        /**
+         * Named, independently visible pen canvases. The legacy fields above
+         * always point at the current paper for compiler compatibility.
+         * @type {Object.<string, {skinId: int, drawableId: int, visible: boolean}>}
+         * @private
+         */
+        this._papers = Object.create(null);
+        this._papers.default = {
+            skinId: -1,
+            drawableId: -1,
+            visible: true
+        };
+        this._paperOrder = ['default'];
+        this._currentPaper = 'default';
+        this._penTiling = runtime.runtimeOptions.penTiling;
+
         this._onTargetCreated = this._onTargetCreated.bind(this);
         this._onTargetMoved = this._onTargetMoved.bind(this);
+        this._onRuntimeOptionsChanged = this._onRuntimeOptionsChanged.bind(this);
 
         runtime.on('targetWasCreated', this._onTargetCreated);
-        runtime.on('RUNTIME_DISPOSED', this.clear.bind(this));
+        runtime.on('RUNTIME_OPTIONS_CHANGED', this._onRuntimeOptionsChanged);
+        runtime.on('RUNTIME_DISPOSED', this._dispose.bind(this));
     }
 
     /**
@@ -85,6 +113,17 @@ class Scratch3PenBlocks {
             penAttributes: {
                 color4f: [0, 0, 1, 1],
                 diameter: 1
+            },
+            printAttributes: {
+                font: 'Sans Serif',
+                size: 24,
+                color: '#9966ff',
+                strokeColor: '#000000',
+                strokeWidth: 0,
+                weight: 'normal',
+                italic: false,
+                wordWrap: false,
+                alignment: 'left'
             }
         };
     }
@@ -137,16 +176,91 @@ class Scratch3PenBlocks {
      * @private
      */
     _getPenLayerID () {
+        return this._getPaperLayerID(this._currentPaper);
+    }
+
+    _getPaperLayerID (name) {
         const renderer = this.runtime.renderer;
-        if (this._penSkinId < 0 && renderer) {
-            this._penSkinId = renderer.createPenSkin();
-            this._penDrawableId = renderer.createDrawable(StageLayering.PEN_LAYER);
-            if (renderer.markDrawableAsNoninteractive) {
-                renderer.markDrawableAsNoninteractive(this._penDrawableId);
+        const paper = this._papers[name];
+        if (!paper) return -1;
+        if (paper.skinId < 0 && renderer) {
+            if (this._penTiling) {
+                paper.skinId = renderer.createTiledPenSkin();
+                renderer.setTiledPenSkinVisible(paper.skinId, paper.visible);
+            } else {
+                paper.skinId = renderer.createPenSkin();
+                paper.drawableId = renderer.createDrawable(StageLayering.PEN_LAYER);
+                if (renderer.markDrawableAsNoninteractive) {
+                    renderer.markDrawableAsNoninteractive(paper.drawableId);
+                }
+                renderer.updateDrawableSkinId(paper.drawableId, paper.skinId);
+                renderer.updateDrawableVisible(paper.drawableId, paper.visible);
             }
-            renderer.updateDrawableSkinId(this._penDrawableId, this._penSkinId);
+            this._syncPaperDrawOrder();
         }
-        return this._penSkinId;
+        if (name === this._currentPaper) {
+            this._penSkinId = paper.skinId;
+            this._penDrawableId = paper.drawableId;
+        }
+        return paper.skinId;
+    }
+
+    _paperName (value) {
+        return Cast.toString(value);
+    }
+
+    _paperMenu () {
+        return this._paperOrder.slice();
+    }
+
+    _syncPaperDrawOrder () {
+        const renderer = this.runtime.renderer;
+        for (let i = this._paperOrder.length - 1; i >= 0; i--) {
+            const paper = this._papers[this._paperOrder[i]];
+            if (paper.drawableId >= 0) {
+                renderer.setDrawableOrder(paper.drawableId, -Infinity, StageLayering.PEN_LAYER);
+            } else if (paper.skinId >= 0) {
+                renderer.setTiledPenSkinOrder(paper.skinId, -Infinity);
+            }
+        }
+    }
+
+    _onRuntimeOptionsChanged (runtimeOptions) {
+        const penTiling = runtimeOptions.penTiling;
+        if (penTiling === this._penTiling) return;
+        const renderer = this.runtime.renderer;
+        for (const name of Object.keys(this._papers)) {
+            const paper = this._papers[name];
+            if (paper.drawableId >= 0) renderer.destroyDrawable(paper.drawableId, StageLayering.PEN_LAYER);
+            if (paper.skinId >= 0) renderer.destroySkin(paper.skinId);
+            paper.skinId = -1;
+            paper.drawableId = -1;
+        }
+        this._penTiling = penTiling;
+        this._penSkinId = -1;
+        this._penDrawableId = -1;
+        this.runtime.requestRedraw();
+    }
+
+    _dispose () {
+        const renderer = this.runtime.renderer;
+        if (renderer) {
+            for (const name of Object.keys(this._papers)) {
+                const paper = this._papers[name];
+                if (paper.drawableId >= 0) renderer.destroyDrawable(paper.drawableId, StageLayering.PEN_LAYER);
+                if (paper.skinId >= 0) renderer.destroySkin(paper.skinId);
+            }
+        }
+        this._papers = Object.create(null);
+        this._papers.default = {
+            skinId: -1,
+            drawableId: -1,
+            visible: true
+        };
+        this._paperOrder = ['default'];
+        this._currentPaper = 'default';
+        this._penSkinId = -1;
+        this._penDrawableId = -1;
     }
 
     /**
@@ -322,6 +436,22 @@ class Scratch3PenBlocks {
                     })
                 },
                 {
+                    opcode: 'clearPaper',
+                    blockType: BlockType.COMMAND,
+                    text: formatMessage({
+                        id: 'pen.clearPaper',
+                        default: 'erase paper named [PAPER]',
+                        description: 'erase all pen trails and stamps from a named pen drawing layer'
+                    }),
+                    arguments: {
+                        PAPER: {
+                            type: ArgumentType.STRING,
+                            menu: 'papers',
+                            defaultValue: 'default'
+                        }
+                    }
+                },
+                {
                     opcode: 'stamp',
                     blockType: BlockType.COMMAND,
                     text: formatMessage({
@@ -440,6 +570,348 @@ class Scratch3PenBlocks {
                     },
                     filter: [TargetType.SPRITE]
                 },
+
+                '---',
+
+                {
+                    opcode: 'printText',
+                    blockType: BlockType.COMMAND,
+                    text: formatMessage({
+                        id: 'pen.printText',
+                        default: 'print [TEXT] at x: [X] y: [Y]',
+                        description: 'draw text on the selected pen paper'
+                    }),
+                    arguments: {
+                        TEXT: {
+                            type: ArgumentType.STRING,
+                            canMultiline: true,
+                            defaultValue: 'Hello!'
+                        },
+                        X: {
+                            type: ArgumentType.NUMBER,
+                            defaultValue: 0
+                        },
+                        Y: {
+                            type: ArgumentType.NUMBER,
+                            defaultValue: 0
+                        }
+                    },
+                    filter: [TargetType.SPRITE]
+                },
+                {
+                    opcode: 'setPrintFont',
+                    blockType: BlockType.COMMAND,
+                    text: formatMessage({
+                        id: 'pen.setPrintFont',
+                        default: 'set print font to [FONT]',
+                        description: 'set the font used by the pen print block'
+                    }),
+                    arguments: {
+                        FONT: {
+                            type: ArgumentType.STRING,
+                            menu: 'printFonts',
+                            defaultValue: 'Sans Serif'
+                        }
+                    },
+                    filter: [TargetType.SPRITE]
+                },
+                {
+                    opcode: 'setPrintFontSize',
+                    blockType: BlockType.COMMAND,
+                    text: formatMessage({
+                        id: 'pen.setPrintFontSize',
+                        default: 'set print font size to [SIZE]',
+                        description: 'set the font size used by the pen print block'
+                    }),
+                    arguments: {
+                        SIZE: {
+                            type: ArgumentType.NUMBER,
+                            defaultValue: 24
+                        }
+                    },
+                    filter: [TargetType.SPRITE]
+                },
+                {
+                    opcode: 'setPrintColor',
+                    blockType: BlockType.COMMAND,
+                    text: formatMessage({
+                        id: 'pen.setPrintColor',
+                        default: 'set print [TARGET] color to [COLOR]',
+                        description: 'set the fill or outline color used by the pen print block'
+                    }),
+                    arguments: {
+                        TARGET: {
+                            type: ArgumentType.STRING,
+                            menu: 'printColorTarget'
+                        },
+                        COLOR: {
+                            type: ArgumentType.COLOR,
+                            defaultValue: '#9966ff'
+                        }
+                    },
+                    filter: [TargetType.SPRITE]
+                },
+                {
+                    opcode: 'setPrintStrokeWidth',
+                    blockType: BlockType.COMMAND,
+                    text: formatMessage({
+                        id: 'pen.setPrintStrokeWidth',
+                        default: 'set print stroke width to [WIDTH]',
+                        description: 'set the outline width used by the pen print block'
+                    }),
+                    arguments: {
+                        WIDTH: {
+                            type: ArgumentType.NUMBER,
+                            defaultValue: 0
+                        }
+                    },
+                    filter: [TargetType.SPRITE]
+                },
+                {
+                    opcode: 'setPrintFontWeight',
+                    blockType: BlockType.COMMAND,
+                    text: formatMessage({
+                        id: 'pen.setPrintFontWeight',
+                        default: 'set print font weight to [WEIGHT]',
+                        description: 'set the font weight used by the pen print block'
+                    }),
+                    arguments: {
+                        WEIGHT: {
+                            type: ArgumentType.STRING,
+                            menu: 'fontWeights',
+                            defaultValue: 'normal'
+                        }
+                    },
+                    filter: [TargetType.SPRITE]
+                },
+                {
+                    opcode: 'setPrintItalic',
+                    blockType: BlockType.COMMAND,
+                    text: formatMessage({
+                        id: 'pen.setPrintItalic',
+                        default: 'turn print font italics [STATE]',
+                        description: 'turn italics on or off for the pen print block'
+                    }),
+                    arguments: {
+                        STATE: {
+                            type: ArgumentType.STRING,
+                            menu: 'onOff'
+                        }
+                    },
+                    filter: [TargetType.SPRITE]
+                },
+                {
+                    opcode: 'setPrintWordWrap',
+                    blockType: BlockType.COMMAND,
+                    text: formatMessage({
+                        id: 'pen.setPrintWordWrap',
+                        default: 'turn print word wrapping [STATE]',
+                        description: 'turn word wrapping on or off for the pen print block'
+                    }),
+                    arguments: {
+                        STATE: {
+                            type: ArgumentType.STRING,
+                            menu: 'onOff'
+                        }
+                    },
+                    filter: [TargetType.SPRITE]
+                },
+                {
+                    opcode: 'setPrintAlignment',
+                    blockType: BlockType.COMMAND,
+                    text: formatMessage({
+                        id: 'pen.setPrintAlignment',
+                        default: 'set print text alignment to [ALIGNMENT]',
+                        description: 'set the horizontal alignment used by the pen print block'
+                    }),
+                    arguments: {
+                        ALIGNMENT: {
+                            type: ArgumentType.STRING,
+                            menu: 'textAlignment'
+                        }
+                    },
+                    filter: [TargetType.SPRITE]
+                },
+
+                '---',
+
+                {
+                    opcode: 'createPaper',
+                    blockType: BlockType.COMMAND,
+                    text: formatMessage({
+                        id: 'pen.createPaper',
+                        default: 'create paper named [PAPER]',
+                        description: 'create a named pen drawing layer'
+                    }),
+                    arguments: {
+                        PAPER: {
+                            type: ArgumentType.STRING,
+                            defaultValue: 'my paper'
+                        }
+                    }
+                },
+                {
+                    opcode: 'removePaper',
+                    blockType: BlockType.COMMAND,
+                    text: formatMessage({
+                        id: 'pen.removePaper',
+                        default: 'remove paper named [PAPER]',
+                        description: 'remove a named pen drawing layer'
+                    }),
+                    arguments: {
+                        PAPER: {
+                            type: ArgumentType.STRING,
+                            menu: 'papers',
+                            defaultValue: 'default'
+                        }
+                    }
+                },
+                {
+                    opcode: 'combinePapers',
+                    blockType: BlockType.COMMAND,
+                    text: formatMessage({
+                        id: 'pen.combinePapers',
+                        default: '[MODE] paper [SOURCE] into [DESTINATION]',
+                        description: 'copy or merge the pixels from one pen drawing layer into another'
+                    }),
+                    arguments: {
+                        MODE: {
+                            type: ArgumentType.STRING,
+                            menu: 'paperCombineMode'
+                        },
+                        SOURCE: {
+                            type: ArgumentType.STRING,
+                            menu: 'papers',
+                            defaultValue: 'default'
+                        },
+                        DESTINATION: {
+                            type: ArgumentType.STRING,
+                            menu: 'papers',
+                            defaultValue: 'default'
+                        }
+                    }
+                },
+                {
+                    opcode: 'paperExists',
+                    blockType: BlockType.BOOLEAN,
+                    text: formatMessage({
+                        id: 'pen.paperExists',
+                        default: 'paper [PAPER] exists?',
+                        description: 'check whether a named pen drawing layer exists'
+                    }),
+                    arguments: {
+                        PAPER: {
+                            type: ArgumentType.STRING,
+                            defaultValue: 'my paper'
+                        }
+                    }
+                },
+                {
+                    opcode: 'allPapers',
+                    blockType: BlockType.ARRAY,
+                    text: formatMessage({
+                        id: 'pen.allPapers',
+                        default: 'all papers',
+                        description: 'report the names of all pen drawing layers'
+                    })
+                },
+                {
+                    opcode: 'setPaperIndex',
+                    blockType: BlockType.COMMAND,
+                    text: formatMessage({
+                        id: 'pen.setPaperIndex',
+                        default: 'set paper [PAPER] layer to [INDEX]',
+                        description: 'set the stacking index of a named pen drawing layer'
+                    }),
+                    arguments: {
+                        PAPER: {
+                            type: ArgumentType.STRING,
+                            menu: 'papers',
+                            defaultValue: 'default'
+                        },
+                        INDEX: {
+                            type: ArgumentType.NUMBER,
+                            defaultValue: 0
+                        }
+                    }
+                },
+                {
+                    opcode: 'paperIndex',
+                    blockType: BlockType.REPORTER,
+                    text: formatMessage({
+                        id: 'pen.paperIndex',
+                        default: 'index of paper [PAPER]',
+                        description: 'report the stacking index of a named pen drawing layer'
+                    }),
+                    arguments: {
+                        PAPER: {
+                            type: ArgumentType.STRING,
+                            menu: 'papers',
+                            defaultValue: 'default'
+                        }
+                    }
+                },
+                {
+                    opcode: 'switchPaper',
+                    blockType: BlockType.COMMAND,
+                    text: formatMessage({
+                        id: 'pen.switchPaper',
+                        default: 'switch paper to [PAPER]',
+                        description: 'select the pen drawing layer used by pen blocks'
+                    }),
+                    arguments: {
+                        PAPER: {
+                            type: ArgumentType.STRING,
+                            menu: 'papers',
+                            defaultValue: 'default'
+                        }
+                    }
+                },
+                {
+                    opcode: 'currentPaper',
+                    blockType: BlockType.REPORTER,
+                    text: formatMessage({
+                        id: 'pen.currentPaper',
+                        default: 'current paper',
+                        description: 'report the name of the selected pen drawing layer'
+                    })
+                },
+                {
+                    opcode: 'setPaperVisibility',
+                    blockType: BlockType.COMMAND,
+                    text: formatMessage({
+                        id: 'pen.setPaperVisibility',
+                        default: '[VISIBILITY] paper [PAPER]',
+                        description: 'show or hide a named pen drawing layer'
+                    }),
+                    arguments: {
+                        VISIBILITY: {
+                            type: ArgumentType.STRING,
+                            menu: 'visibility'
+                        },
+                        PAPER: {
+                            type: ArgumentType.STRING,
+                            menu: 'papers',
+                            defaultValue: 'default'
+                        }
+                    }
+                },
+                {
+                    opcode: 'paperIsVisible',
+                    blockType: BlockType.BOOLEAN,
+                    text: formatMessage({
+                        id: 'pen.paperIsVisible',
+                        default: 'is paper [PAPER] visible?',
+                        description: 'check whether a named pen drawing layer is visible'
+                    }),
+                    arguments: {
+                        PAPER: {
+                            type: ArgumentType.STRING,
+                            menu: 'papers',
+                            defaultValue: 'default'
+                        }
+                    }
+                },
                 /* Legacy blocks, should not be shown in flyout */
                 {
                     opcode: 'setPenShadeToNumber',
@@ -510,6 +982,74 @@ class Scratch3PenBlocks {
                 colorParam: {
                     acceptReporters: true,
                     items: this._initColorParam()
+                },
+                printFonts: {
+                    acceptReporters: true,
+                    items: '_printFontMenu'
+                },
+                printColorTarget: {
+                    acceptReporters: true,
+                    items: [
+                        {
+                            text: formatMessage({
+                                id: 'pen.printColorTargetMenu.fill',
+                                default: 'fill',
+                                description: 'fill option in the pen print color menu'
+                            }),
+                            value: 'fill'
+                        },
+                        {
+                            text: formatMessage({
+                                id: 'pen.printColorTargetMenu.stroke',
+                                default: 'stroke',
+                                description: 'stroke option in the pen print color menu'
+                            }),
+                            value: 'stroke'
+                        }
+                    ]
+                },
+                fontWeights: {
+                    acceptReporters: true,
+                    acceptText: true,
+                    items: ['normal', 'bold', '100', '200', '300', '400', '500', '600', '700', '800', '900']
+                },
+                onOff: {
+                    acceptReporters: true,
+                    items: ['off', 'on']
+                },
+                textAlignment: {
+                    acceptReporters: true,
+                    items: ['left', 'center', 'right']
+                },
+                papers: {
+                    acceptReporters: true,
+                    acceptText: true,
+                    items: '_paperMenu'
+                },
+                visibility: {
+                    acceptReporters: true,
+                    items: [
+                        {
+                            text: formatMessage({
+                                id: 'pen.paperVisibilityMenu.show',
+                                default: 'show',
+                                description: 'show option in the pen paper visibility menu'
+                            }),
+                            value: 'show'
+                        },
+                        {
+                            text: formatMessage({
+                                id: 'pen.paperVisibilityMenu.hide',
+                                default: 'hide',
+                                description: 'hide option in the pen paper visibility menu'
+                            }),
+                            value: 'hide'
+                        }
+                    ]
+                },
+                paperCombineMode: {
+                    acceptReporters: true,
+                    items: ['merge', 'copy']
                 }
             }
         };
@@ -519,11 +1059,23 @@ class Scratch3PenBlocks {
      * The pen "clear" block clears the pen layer's contents.
      */
     clear () { // used by compiler
-        const penSkinId = this._getPenLayerID();
-        if (penSkinId >= 0) {
-            this.runtime.renderer.penClear(penSkinId);
-            this.runtime.requestRedraw();
+        for (const name of Object.keys(this._papers)) {
+            if (this._papers[name].skinId >= 0) {
+                this.runtime.renderer.penClear(this._papers[name].skinId);
+            }
         }
+        this.runtime.requestRedraw();
+    }
+
+    clearPaper (args) {
+        this._clearPaper(this._paperName(args.PAPER));
+    }
+
+    _clearPaper (name) {
+        const paper = this._papers[name];
+        if (!paper || paper.skinId < 0) return;
+        this.runtime.renderer.penClear(paper.skinId);
+        this.runtime.requestRedraw();
     }
 
     /**
@@ -537,7 +1089,11 @@ class Scratch3PenBlocks {
     _stamp (target) { // used by compiler
         const penSkinId = this._getPenLayerID();
         if (penSkinId >= 0) {
-            this.runtime.renderer.penStamp(penSkinId, target.drawableID);
+            if (this.runtime.extensionManager.isExtensionLoaded('camera')) {
+                this.runtime.renderer.penStampInWorldSpace(penSkinId, target.drawableID);
+            } else {
+                this.runtime.renderer.penStamp(penSkinId, target.drawableID);
+            }
             this.runtime.requestRedraw();
         }
     }
@@ -709,6 +1265,292 @@ class Scratch3PenBlocks {
     _setPenSizeTo (size, target) { // used by compiler
         const penAttributes = this._getPenState(target).penAttributes;
         penAttributes.diameter = this._clampPenSize(size);
+    }
+
+    _getPrintAttributes (target) {
+        const penState = this._getPenState(target);
+        if (!penState.printAttributes) {
+            penState.printAttributes = Clone.simple(Scratch3PenBlocks.DEFAULT_PEN_STATE.printAttributes);
+        }
+        return penState.printAttributes;
+    }
+
+    _printFontMenu () {
+        const projectFonts = this.runtime.fontManager.getFonts().map(font => font.name);
+        return Array.from(new Set([...BUILT_IN_PRINT_FONTS, ...projectFonts]));
+    }
+
+    _resolvePrintFont (fontName) {
+        const name = Cast.toString(fontName);
+        const builtIn = BUILT_IN_PRINT_FONTS.find(font => font.toLowerCase() === name.toLowerCase());
+        if (builtIn) return `"${builtIn}"`;
+        const projectFont = this.runtime.fontManager.getFonts().find(font =>
+            font.name.toLowerCase() === name.toLowerCase()
+        );
+        if (projectFont) return projectFont.family;
+        return this.runtime.fontManager.isValidSystemFont(name) ? `"${name}", sans-serif` : '"Sans Serif"';
+    }
+
+    printText (args, util) {
+        return this._printText(
+            Cast.toString(args.TEXT),
+            Cast.toNumber(args.X),
+            Cast.toNumber(args.Y),
+            util.target
+        );
+    }
+
+    _printText (text, x, y, target) {
+        if (!text) return;
+        const attributes = this._getPrintAttributes(target);
+        const penSkinId = this._getPenLayerID();
+        if (penSkinId < 0) return;
+        const result = this.runtime.renderer.penText(penSkinId, text, {
+            family: this._resolvePrintFont(attributes.font),
+            size: attributes.size,
+            color: attributes.color,
+            strokeColor: attributes.strokeColor,
+            strokeWidth: attributes.strokeWidth,
+            weight: attributes.weight,
+            italic: attributes.italic,
+            wordWrap: attributes.wordWrap,
+            alignment: attributes.alignment
+        }, x, y);
+        if (result && typeof result.then === 'function') {
+            return result.then(() => this.runtime.requestRedraw());
+        }
+        this.runtime.requestRedraw();
+    }
+
+    setPrintFont (args, util) {
+        this._setPrintFont(Cast.toString(args.FONT), util.target);
+    }
+
+    _setPrintFont (font, target) {
+        this._getPrintAttributes(target).font = font;
+    }
+
+    setPrintFontSize (args, util) {
+        this._setPrintFontSize(Cast.toNumber(args.SIZE), util.target);
+    }
+
+    _setPrintFontSize (size, target) {
+        this._getPrintAttributes(target).size = MathUtil.clamp(size, 1, 1200);
+    }
+
+    setPrintColor (args, util) {
+        this._setPrintColor(Cast.toString(args.TARGET), args.COLOR, util.target);
+    }
+
+    _setPrintColor (targetName, colorValue, target) {
+        const printAttributes = this._getPrintAttributes(target);
+        const color = Color.rgbToHex(Cast.toRgbColorObject(colorValue));
+        if (targetName.toLowerCase() === 'stroke') {
+            printAttributes.strokeColor = color;
+        } else {
+            printAttributes.color = color;
+        }
+    }
+
+    setPrintStrokeWidth (args, util) {
+        this._setPrintStrokeWidth(Cast.toNumber(args.WIDTH), util.target);
+    }
+
+    _setPrintStrokeWidth (width, target) {
+        this._getPrintAttributes(target).strokeWidth = MathUtil.clamp(width, 0, 1200);
+    }
+
+    setPrintFontWeight (args, util) {
+        this._setPrintFontWeight(Cast.toString(args.WEIGHT), util.target);
+    }
+
+    _setPrintFontWeight (weightValue, target) {
+        const weight = weightValue.toLowerCase();
+        let normalizedWeight = 'normal';
+        if (weight === 'normal' || weight === 'bold') {
+            normalizedWeight = weight;
+        } else if (/^\d+$/.test(weight)) {
+            normalizedWeight = MathUtil.clamp(Number(weight), 1, 1000).toString();
+        }
+        this._getPrintAttributes(target).weight = normalizedWeight;
+    }
+
+    setPrintItalic (args, util) {
+        this._setPrintItalic(Cast.toString(args.STATE), util.target);
+    }
+
+    _setPrintItalic (state, target) {
+        this._getPrintAttributes(target).italic = state.toLowerCase() === 'on';
+    }
+
+    setPrintWordWrap (args, util) {
+        this._setPrintWordWrap(Cast.toString(args.STATE), util.target);
+    }
+
+    _setPrintWordWrap (state, target) {
+        this._getPrintAttributes(target).wordWrap = state.toLowerCase() === 'on';
+    }
+
+    setPrintAlignment (args, util) {
+        this._setPrintAlignment(Cast.toString(args.ALIGNMENT), util.target);
+    }
+
+    _setPrintAlignment (alignmentValue, target) {
+        const alignment = alignmentValue.toLowerCase();
+        this._getPrintAttributes(target).alignment = ['left', 'center', 'right'].includes(alignment) ?
+            alignment : 'left';
+    }
+
+    createPaper (args) {
+        this._createPaper(this._paperName(args.PAPER));
+    }
+
+    _createPaper (name) {
+        if (!name) return;
+        if (this._papers[name]) return;
+        this._papers[name] = {
+            skinId: -1,
+            drawableId: -1,
+            visible: true
+        };
+        this._paperOrder.push(name);
+        this.runtime.requestRedraw();
+    }
+
+    removePaper (args) {
+        this._removePaper(this._paperName(args.PAPER));
+    }
+
+    _removePaper (name) {
+        const paper = this._papers[name];
+        if (!paper) return;
+        const renderer = this.runtime.renderer;
+        if (paper.drawableId >= 0) renderer.destroyDrawable(paper.drawableId, StageLayering.PEN_LAYER);
+        if (paper.skinId >= 0) renderer.destroySkin(paper.skinId);
+        delete this._papers[name];
+        this._paperOrder.splice(this._paperOrder.indexOf(name), 1);
+        if (this._currentPaper === name) {
+            this._currentPaper = this._paperOrder.length ? this._paperOrder[0] : 'default';
+        }
+        if (!this._paperOrder.length) {
+            this._papers.default = {
+                skinId: -1,
+                drawableId: -1,
+                visible: true
+            };
+            this._paperOrder.push('default');
+        }
+        const current = this._papers[this._currentPaper];
+        this._penSkinId = current.skinId;
+        this._penDrawableId = current.drawableId;
+        this.runtime.requestRedraw();
+    }
+
+    combinePapers (args) {
+        this._combinePapers(
+            Cast.toString(args.MODE),
+            this._paperName(args.SOURCE),
+            this._paperName(args.DESTINATION)
+        );
+    }
+
+    _combinePapers (modeValue, sourceName, destinationName) {
+        if (sourceName === destinationName) return;
+        const source = this._papers[sourceName];
+        const destination = this._papers[destinationName];
+        if (!source || !destination) return;
+
+        if (source.skinId >= 0) {
+            const destinationSkinId = this._getPaperLayerID(destinationName);
+            if (source.drawableId >= 0) {
+                this.runtime.renderer.penStamp(destinationSkinId, source.drawableId);
+            } else {
+                this.runtime.renderer.penStampTiledLayer(destinationSkinId, source.skinId);
+            }
+            this.runtime.requestRedraw();
+        }
+
+        if (modeValue.toLowerCase() === 'merge') {
+            const sourceWasCurrent = this._currentPaper === sourceName;
+            this._removePaper(sourceName);
+            if (sourceWasCurrent) this._switchPaper(destinationName);
+        }
+    }
+
+    paperExists (args) {
+        return this._paperExists(this._paperName(args.PAPER));
+    }
+
+    _paperExists (name) {
+        return Boolean(this._papers[name]);
+    }
+
+    allPapers () {
+        return this._paperMenu();
+    }
+
+    setPaperIndex (args) {
+        this._setPaperIndex(this._paperName(args.PAPER), Cast.toNumber(args.INDEX));
+    }
+
+    _setPaperIndex (name, index) {
+        const oldIndex = this._paperOrder.indexOf(name);
+        if (oldIndex < 0) return;
+        const newIndex = MathUtil.clamp(Math.round(index), 0, this._paperOrder.length - 1);
+        this._paperOrder.splice(oldIndex, 1);
+        this._paperOrder.splice(newIndex, 0, name);
+        this._syncPaperDrawOrder();
+        this.runtime.requestRedraw();
+    }
+
+    paperIndex (args) {
+        return this._paperIndex(this._paperName(args.PAPER));
+    }
+
+    _paperIndex (name) {
+        const index = this._paperOrder.indexOf(name);
+        return index < 0 ? '' : index;
+    }
+
+    switchPaper (args) {
+        this._switchPaper(this._paperName(args.PAPER));
+    }
+
+    _switchPaper (name) {
+        if (!this._papers[name]) return;
+        this._currentPaper = name;
+        const paper = this._papers[name];
+        this._penSkinId = paper.skinId;
+        this._penDrawableId = paper.drawableId;
+    }
+
+    currentPaper () {
+        return this._currentPaper;
+    }
+
+    setPaperVisibility (args) {
+        this._setPaperVisibility(Cast.toString(args.VISIBILITY), this._paperName(args.PAPER));
+    }
+
+    _setPaperVisibility (visibility, name) {
+        const paper = this._papers[name];
+        if (!paper) return;
+        paper.visible = visibility === 'show';
+        if (paper.drawableId >= 0) {
+            this.runtime.renderer.updateDrawableVisible(paper.drawableId, paper.visible);
+        } else if (paper.skinId >= 0) {
+            this.runtime.renderer.setTiledPenSkinVisible(paper.skinId, paper.visible);
+        }
+        this.runtime.requestRedraw();
+    }
+
+    paperIsVisible (args) {
+        return this._paperIsVisible(this._paperName(args.PAPER));
+    }
+
+    _paperIsVisible (name) {
+        const paper = this._papers[name];
+        return Boolean(paper && paper.visible);
     }
 
     /* LEGACY OPCODES */

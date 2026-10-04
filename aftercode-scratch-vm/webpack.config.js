@@ -100,10 +100,6 @@ module.exports = [
                     loader: 'script-loader'
                 },
                 {
-                    test: require.resolve('scratch-blocks/dist/vertical.js'),
-                    loader: 'expose-loader?Blockly'
-                },
-                {
                     test: require.resolve('scratch-audio/src/index.js'),
                     loader: 'expose-loader?AudioEngine'
                 },
@@ -122,9 +118,6 @@ module.exports = [
         },
         plugins: base.plugins.concat([
             new CopyWebpackPlugin([{
-                from: 'node_modules/scratch-blocks/media',
-                to: 'media'
-            }, {
                 from: 'node_modules/scratch-storage/dist/web'
             }, {
                 from: 'node_modules/scratch-render/dist/web'

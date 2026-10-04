@@ -108,5 +108,11 @@
         "xml": {
             "outerHTML": "<block type='data_listcontents' id='another block' x='0' y='0'><field name='LIST' id='mock list id' variabletype=''>a mock list</field></block>"
         }
+    },
+    "mockTableBlock": {
+        "name": "block",
+        "xml": {
+            "outerHTML": "<block type='data_tablecontents' id='another block' x='0' y='0'><field name='TABLE' id='mock table id' variabletype=''>a mock table</field></block>"
+        }
     }
 }

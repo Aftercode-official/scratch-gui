@@ -26,6 +26,8 @@ const domToBlock = function (blockDOM, blocks, isTopBlock, parent) {
         topLevel: isTopBlock, // If this block starts a stack.
         parent: parent, // Parent block ID, if available.
         shadow: blockDOM.name === 'shadow', // If this represents a shadow/slot.
+        collapsed: blockDOM.attribs.collapsed === 'true', // If block is collapsed.
+        monitorMode: blockDOM.attribs.monitor_mode, // Preferred monitor presentation.
         x: blockDOM.attribs.x, // X position of script, if top-level.
         y: blockDOM.attribs.y // Y position of script, if top-level.
     };

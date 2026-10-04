@@ -15,9 +15,9 @@ test('_isValidExtensionURL', t => {
     const manager = new ExtensionManager(fakeRuntime);
     t.equal(manager._isValidExtensionURL('fetch'), false);
     t.equal(manager._isValidExtensionURL(''), false);
-    t.equal(manager._isValidExtensionURL('aftercode-extensions.vercel.app/fetch.js'), false);
-    t.equal(manager._isValidExtensionURL('https://aftercode-extensions.vercel.app/fetch.js'), true);
-    t.equal(manager._isValidExtensionURL('https://aftercode-extensions.vercel.app/fetch.js'), true);
+    t.equal(manager._isValidExtensionURL('extensions.turbowarp.org/fetch.js'), false);
+    t.equal(manager._isValidExtensionURL('https://extensions.turbowarp.org/fetch.js'), true);
+    t.equal(manager._isValidExtensionURL('http://extensions.turbowarp.org/fetch.js'), true);
     t.equal(manager._isValidExtensionURL('http://localhost:8000'), true);
     t.equal(manager._isValidExtensionURL('data:application/javascript;base64,YWxlcnQoMSk='), true);
     t.equal(manager._isValidExtensionURL('file:///home/test/extension.js'), true);
@@ -47,7 +47,7 @@ test('loadExtensionURL, getExtensionURLs, deduplication', async t => {
         }
     };
 
-    const url1 = 'https://aftercode-extensions.vercel.app/1.js';
+    const url1 = 'https://turbowarp.org/1.js';
     t.equal(vm.extensionManager.isExtensionURLLoaded(url1), false);
     t.same(vm.extensionManager.getExtensionURLs(), {});
     await vm.extensionManager.loadExtensionURL(url1);
@@ -66,7 +66,7 @@ test('loadExtensionURL, getExtensionURLs, deduplication', async t => {
     });
 
     // Loading another extension should work
-    const url2 = 'https://aftercode-extensions.vercel.app/2.js';
+    const url2 = 'https://turbowarp.org/2.js';
     t.equal(vm.extensionManager.isExtensionURLLoaded(url2), false);
     await vm.extensionManager.loadExtensionURL(url2);
     t.equal(vm.extensionManager.isExtensionURLLoaded(url2), true);

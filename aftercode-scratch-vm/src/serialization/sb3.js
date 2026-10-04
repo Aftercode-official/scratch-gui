@@ -9,6 +9,7 @@ const Blocks = require('../engine/blocks');
 const Sprite = require('../sprites/sprite');
 const Variable = require('../engine/variable');
 const Comment = require('../engine/comment');
+const Group = require('../engine/group');
 const MonitorRecord = require('../engine/monitor-record');
 const StageLayering = require('../engine/stage-layering');
 const log = require('../util/log');
@@ -16,11 +17,12 @@ const uid = require('../util/uid');
 const MathUtil = require('../util/math-util');
 const StringUtil = require('../util/string-util');
 const VariableUtil = require('../util/variable-util');
+const ExtendedJSON = require('@turbowarp/json');
 const compress = require('./tw-compress-sb3');
 
 const {loadCostume} = require('../import/load-costume.js');
 const {loadSound} = require('../import/load-sound.js');
-const {deserializeCostume, deserializeSound} = require('./deserialize-assets.js');
+const {deserializeCostume, deserializeSound, deserializeAsset} = require('./deserialize-assets.js');
 
 const hasOwnProperty = Object.prototype.hasOwnProperty;
 
@@ -45,9 +47,11 @@ const INPUT_DIFF_BLOCK_SHADOW = 3; // obscured shadow
 // Constants used during deserialization of an SB3 file
 const CORE_EXTENSIONS = [
     'argument',
+    'assets',
     'colour',
     'control',
     'data',
+    'json',
     'event',
     'looks',
     'math',
@@ -80,6 +84,8 @@ const BROADCAST_PRIMITIVE = 11;
 const VAR_PRIMITIVE = 12;
 // data_listcontents
 const LIST_PRIMITIVE = 13;
+// data_tablecontents
+const TABLE_PRIMITIVE = 14;
 
 // Map block opcodes to the above primitives and the name of the field we can use
 // to find the value of the field
@@ -93,7 +99,8 @@ const primitiveOpcodeInfoMap = {
     text: [TEXT_PRIMITIVE, 'TEXT'],
     event_broadcast_menu: [BROADCAST_PRIMITIVE, 'BROADCAST_OPTION'],
     data_variable: [VAR_PRIMITIVE, 'VARIABLE'],
-    data_listcontents: [LIST_PRIMITIVE, 'LIST']
+    data_listcontents: [LIST_PRIMITIVE, 'LIST'],
+    data_tablecontents: [TABLE_PRIMITIVE, 'TABLE']
 };
 
 // We don't enforce this limit, but Scratch does, so we need to handle it for compatibility.
@@ -116,7 +123,11 @@ const serializePrimitiveBlock = function (block) {
         const primitiveDesc = [primitiveConstant, field.value];
         if (block.opcode === 'event_broadcast_menu') {
             primitiveDesc.push(field.id);
-        } else if (block.opcode === 'data_variable' || block.opcode === 'data_listcontents') {
+        } else if (
+            block.opcode === 'data_variable' ||
+            block.opcode === 'data_listcontents' ||
+            block.opcode === 'data_tablecontents'
+        ) {
             primitiveDesc.push(field.id);
             if (block.topLevel) {
                 primitiveDesc.push(block.x ? Math.round(block.x) : 0);
@@ -219,6 +230,9 @@ const serializeBlock = function (block) {
     if (block.comment) {
         obj.comment = block.comment;
     }
+    if (block.collapsed) {
+        obj.collapsed = true;
+    }
     return obj;
 };
 
@@ -284,6 +298,11 @@ const compressInputTree = function (block, blocks) {
  * @return {?string} The extension ID, if it exists and is not a core extension.
  */
 const getExtensionIdForOpcode = function (opcode) {
+    // text_multiline is a generic input shadow used by extension blocks. It is
+    // compiled like the core text primitive and does not belong to the
+    // Animated Text extension, despite sharing its `text_` prefix.
+    if (opcode === 'text_multiline') return;
+
     // Allowed ID characters are those matching the regular expression [\w-]: A-Z, a-z, 0-9, and hyphen ("-").
     const index = opcode.indexOf('_');
     const forbiddenSymbols = /[^\w-]/g;
@@ -435,6 +454,7 @@ const serializeStandaloneBlocks = (blocks, runtime) => {
 const serializeCostume = function (costume) {
     const obj = Object.create(null);
     obj.name = costume.name;
+    if (costume.folderId) obj.folderId = costume.folderId;
 
     const costumeToSerialize = costume.broken || costume;
 
@@ -464,6 +484,7 @@ const serializeCostume = function (costume) {
 const serializeSound = function (sound) {
     const obj = Object.create(null);
     obj.name = sound.name;
+    if (sound.folderId) obj.folderId = sound.folderId;
 
     const soundToSerialize = sound.broken || sound;
 
@@ -482,6 +503,23 @@ const serializeSound = function (sound) {
 };
 
 /**
+ * Serialize the given asset.
+ * @param {object} asset The asset to be serialized.
+ * @returns {object} A serialized representation of the asset.
+ */
+const serializeAsset = function (asset) {
+    const obj = Object.create(null);
+    obj.name = asset.name;
+    if (asset.folderId) obj.folderId = asset.folderId;
+    obj.lastModified = asset.lastModified;
+    obj.dataFormat = asset.dataFormat.toLowerCase();
+    obj.assetId = asset.assetId;
+    obj.md5ext = asset.md5;
+    obj.contentType = asset.asset.assetType.contentType;
+    return obj;
+};
+
+/**
  * Serialize the given variables object.
  * @param {object} variables The variables to be serialized.
  * @return {object} A serialized representation of the variables. They get
@@ -494,6 +532,7 @@ const serializeVariables = function (variables) {
     // keep track of a type for each
     obj.variables = Object.create(null);
     obj.lists = Object.create(null);
+    obj.tables = Object.create(null);
     obj.broadcasts = Object.create(null);
     for (const varId in variables) {
         const v = variables[varId];
@@ -503,6 +542,14 @@ const serializeVariables = function (variables) {
         }
         if (v.type === Variable.LIST_TYPE) {
             obj.lists[varId] = [v.name, v.value];
+            continue;
+        }
+        if (v.type === Variable.TABLE_TYPE) {
+            obj.tables[varId] = [v.name, v.value];
+            continue;
+        }
+        if (v.type === Variable.TABLE_TYPE) {
+            obj.tables[varId] = [v.name, v.value];
             continue;
         }
 
@@ -527,6 +574,7 @@ const serializeComments = function (comments) {
         serializedComment.width = comment.width;
         serializedComment.height = comment.height;
         serializedComment.minimized = comment.minimized;
+        serializedComment.colour = comment.colour;
 
         if (comment.text.length > UPSTREAM_MAX_COMMENT_LENGTH) {
             // Upstream's scratch-parser will refuse to load projects if the text is too long, so to maximize
@@ -543,6 +591,145 @@ const serializeComments = function (comments) {
     return obj;
 };
 
+const serializeGroups = function (groups) {
+    const obj = Object.create(null);
+    for (const groupId in groups) {
+        if (!Object.prototype.hasOwnProperty.call(groups, groupId)) continue;
+        const group = groups[groupId];
+        obj[groupId] = {
+            title: group.title,
+            colour: group.colour,
+            x: group.x,
+            y: group.y,
+            width: group.width,
+            height: group.height,
+            expandedWidth: group.expandedWidth,
+            expandedHeight: group.expandedHeight,
+            collapsed: group.collapsed,
+            blocks: group.blocks.slice()
+        };
+    }
+    return obj;
+};
+
+const serializeFolder = folder => ({
+    id: folder.id,
+    name: folder.name,
+    kind: folder.kind,
+    color: folder.color || null,
+    scopeId: folder.scopeId || null,
+    parentId: folder.parentId || null,
+    isOpen: folder._isOpen !== false
+});
+
+const normalizeFolderParents = folders => {
+    const foldersById = new Map(folders.map(folder => [folder.id, folder]));
+    for (const folder of folders) {
+        const parent = foldersById.get(folder.parentId);
+        if (!parent || parent.kind !== folder.kind || parent.scopeId !== folder.scopeId) {
+            folder.parentId = null;
+            continue;
+        }
+        const ancestors = new Set([folder.id]);
+        let ancestor = parent;
+        while (ancestor) {
+            if (ancestors.has(ancestor.id)) {
+                folder.parentId = null;
+                break;
+            }
+            ancestors.add(ancestor.id);
+            ancestor = foldersById.get(ancestor.parentId);
+        }
+    }
+    return foldersById;
+};
+
+const makeFolderNamesUnique = folders => {
+    normalizeFolderParents(folders);
+    const siblingNames = new Map();
+    for (const folder of folders) {
+        const key = JSON.stringify([folder.kind, folder.scopeId, folder.parentId]);
+        let names = siblingNames.get(key);
+        if (!names) {
+            names = [];
+            siblingNames.set(key, names);
+        }
+        folder.name = StringUtil.caseInsensitiveUnusedName(folder.name, names);
+        names.push(folder.name);
+    }
+    return folders;
+};
+
+const normalizeProjectFolders = (runtime, targets) => {
+    const targetsBySerializedId = new Map();
+    for (const target of targets) {
+        if (typeof target._serializedTargetId === 'string' &&
+            !targetsBySerializedId.has(target._serializedTargetId)) {
+            targetsBySerializedId.set(target._serializedTargetId, target);
+        }
+        delete target._serializedTargetId;
+    }
+
+    const seenFolderIds = new Set();
+    let folders = runtime.projectFolders.filter(folder => {
+        if (!folder.id.trim() || seenFolderIds.has(folder.id) || !folder.name.trim()) return false;
+        if (folder.kind === 'sprite') {
+            folder.scopeId = null;
+            seenFolderIds.add(folder.id);
+            return true;
+        }
+        const scopeTarget = targetsBySerializedId.get(folder.scopeId);
+        if (!scopeTarget || !scopeTarget.isOriginal) return false;
+        folder.scopeId = scopeTarget.id;
+        seenFolderIds.add(folder.id);
+        return true;
+    });
+    folders = makeFolderNamesUnique(folders);
+    const foldersById = normalizeFolderParents(folders);
+
+    const validMembership = (folderId, kind, scopeId) => {
+        const folder = foldersById.get(folderId);
+        return Boolean(folder && folder.kind === kind && folder.scopeId === scopeId);
+    };
+    for (const target of targets) {
+        if (target.isStage || !validMembership(target.folderId, 'sprite', null)) target.folderId = null;
+        for (const [kind, items] of [
+            ['costume', target.getCostumes()],
+            ['sound', target.getSounds()],
+            ['asset', target.getAssets()]
+        ]) {
+            for (const item of items) {
+                if (item && !validMembership(item.folderId, kind, target.id)) item.folderId = null;
+            }
+        }
+    }
+
+    // Empty folders have no tile in the editor and folder operations
+    // delete them as soon as their last member leaves. Apply the same invariant
+    // to loaded projects while preserving ancestors of non-empty folders.
+    const nonEmptyFolderIds = new Set();
+    for (const target of targets) {
+        if (target.folderId) nonEmptyFolderIds.add(target.folderId);
+        for (const items of [target.getCostumes(), target.getSounds(), target.getAssets()]) {
+            for (const item of items) {
+                if (item && item.folderId) nonEmptyFolderIds.add(item.folderId);
+            }
+        }
+    }
+    let foundParent = true;
+    while (foundParent) {
+        foundParent = false;
+        for (const folder of folders) {
+            if (nonEmptyFolderIds.has(folder.id) && folder.parentId &&
+                !nonEmptyFolderIds.has(folder.parentId)) {
+                nonEmptyFolderIds.add(folder.parentId);
+                foundParent = true;
+            }
+        }
+    }
+    runtime.projectFolders = folders.filter(folder => nonEmptyFolderIds.has(folder.id));
+};
+
 /**
  * Serialize the given target. Only serialize properties that are necessary
  * for saving and loading this target.
@@ -554,23 +741,27 @@ const serializeTarget = function (target, extensions) {
     const obj = Object.create(null);
     let targetExtensions = [];
     obj.isStage = target.isStage;
+    obj.id = target.id;
     obj.name = obj.isStage ? 'Stage' : target.name;
+    if (!obj.isStage && target.folderId) obj.folderId = target.folderId;
     const vars = serializeVariables(target.variables);
     obj.variables = vars.variables;
     obj.lists = vars.lists;
+    obj.tables = vars.tables;
     obj.broadcasts = vars.broadcasts;
     [obj.blocks, targetExtensions] = serializeBlocks(target.blocks);
     obj.comments = serializeComments(target.comments);
+    obj.groups = serializeGroups(target.groups);
 
     // TODO remove this check/patch when (#1901) is fixed
     if (target.currentCostume < 0 || target.currentCostume >= target.costumes.length) {
         log.warn(`currentCostume property for target ${target.name} is out of range`);
         target.currentCostume = MathUtil.clamp(target.currentCostume, 0, target.costumes.length - 1);
     }
-
     obj.currentCostume = target.currentCostume;
     obj.costumes = target.costumes.map(serializeCostume);
     obj.sounds = target.sounds.map(serializeSound);
+    obj.assets = target.assets.map(serializeAsset);
     if (Object.prototype.hasOwnProperty.call(target, 'volume')) obj.volume = target.volume;
     if (Object.prototype.hasOwnProperty.call(target, 'layerOrder')) obj.layerOrder = target.layerOrder;
     if (obj.isStage) { // Only the stage should have these properties
@@ -661,7 +852,7 @@ const serializeMonitors = function (monitors, runtime, extensions) {
                 y: monitorData.y - yOffset,
                 visible: monitorData.visible
             };
-            if (monitorData.mode !== 'list') {
+            if (monitorData.mode !== 'list' && monitorData.mode !== 'table') {
                 serializedMonitor.sliderMin = monitorData.sliderMin;
                 serializedMonitor.sliderMax = monitorData.sliderMax;
                 serializedMonitor.isDiscrete = monitorData.isDiscrete;
@@ -713,6 +904,14 @@ const serialize = function (runtime, targetId, {allowOptimization = true} = {}) 
 
     if (targetId) {
         const target = serializedTargets[0];
+        delete target.id;
+        delete target.folderId;
+        const folders = runtime.projectFolders.filter(folder =>
+            folder.scopeId === targetId && folder.kind !== 'sprite'
+        );
+        if (folders.length) {
+            target.folders = folders.map(serializeFolder);
+        }
         if (extensions.size) {
             // Vanilla Scratch doesn't include extensions in sprites, so don't add this if it's not needed
             target.extensions = Array.from(extensions);
@@ -732,6 +931,15 @@ const serialize = function (runtime, targetId, {allowOptimization = true} = {}) 
         obj.extensionStorage = globalExtensionStorage;
     }
 
+    const hasFolders = Array.isArray(runtime.projectFolders) && runtime.projectFolders.length > 0;
+    if (hasFolders) {
+        obj.folders = runtime.projectFolders.map(serializeFolder);
+    } else {
+        // Target IDs are only needed to reconnect target-scoped folders while
+        // loading. Keep ordinary SB3 output unchanged when folders are unused.
+        serializedTargets.forEach(target => delete target.id);
+    }
+
     obj.targets = serializedTargets;
 
     obj.monitors = serializeMonitors(runtime.getMonitorState(), runtime, extensions);
@@ -744,6 +952,11 @@ const serialize = function (runtime, targetId, {allowOptimization = true} = {}) 
 
     if (fonts) {
         obj.customFonts = fonts;
+    }
+
+    const projectOptions = runtime.generateDifferingProjectOptions();
+    if (Object.keys(projectOptions).length > 0) {
+        obj.projectOptions = ExtendedJSON.stringify(projectOptions);
     }
 
     // Assemble metadata
@@ -918,6 +1131,23 @@ const deserializeInputDesc = function (inputDescOrId, parentId, isShadow, blocks
         }
         break;
     }
+    case TABLE_PRIMITIVE: {
+        primitiveObj.opcode = 'data_tablecontents';
+        primitiveObj.fields = {
+            TABLE: {
+                name: 'TABLE',
+                value: inputDescOrId[1],
+                id: inputDescOrId[2],
+                variableType: Variable.TABLE_TYPE
+            }
+        };
+        if (inputDescOrId.length > 3) {
+            primitiveObj.topLevel = true;
+            primitiveObj.x = inputDescOrId[3];
+            primitiveObj.y = inputDescOrId[4];
+        }
+        break;
+    }
     default: {
         log.error(`Found unknown primitive type during deserialization: ${JSON.stringify(inputDescOrId)}`);
         return null;
@@ -992,6 +1222,8 @@ const deserializeFields = function (fields) {
             obj[fieldName].variableType = Variable.SCALAR_TYPE;
         } else if (fieldName === 'LIST') {
             obj[fieldName].variableType = Variable.LIST_TYPE;
+        } else if (fieldName === 'TABLE') {
+            obj[fieldName].variableType = Variable.TABLE_TYPE;
         }
     }
     return obj;
@@ -1063,6 +1295,7 @@ const parseScratchAssets = function (object, runtime, zip) {
             assetId: costumeSource.assetId,
             skinId: null,
             name: costumeSource.name,
+            folderId: typeof costumeSource.folderId === 'string' ? costumeSource.folderId : null,
             bitmapResolution: costumeSource.bitmapResolution,
             rotationCenterX: costumeSource.rotationCenterX,
             rotationCenterY: costumeSource.rotationCenterY
@@ -1093,6 +1326,7 @@ const parseScratchAssets = function (object, runtime, zip) {
             rate: soundSource.rate,
             sampleCount: soundSource.sampleCount,
             name: soundSource.name,
+            folderId: typeof soundSource.folderId === 'string' ? soundSource.folderId : null,
             // TODO we eventually want this property to be called md5ext,
             // but there are many things relying on this particular name at the
             // moment, so this translation is very important
@@ -1109,6 +1343,21 @@ const parseScratchAssets = function (object, runtime, zip) {
             .then(() => loadSound(sound, runtime, assets.soundBank)));
         // Only attempt to load the sound after the deserialization
         // process has been completed.
+    });
+
+    assets.assetPromises = (object.assets || []).map(assetSource => {
+        const asset = {
+            assetId: assetSource.assetId,
+            dataFormat: assetSource.dataFormat,
+            contentType: assetSource.contentType,
+            name: assetSource.name,
+            folderId: typeof assetSource.folderId === 'string' ? assetSource.folderId : null,
+            lastModified: assetSource.lastModified,
+            md5: assetSource.md5ext,
+            data: null
+        };
+
+        return runtime.wrapAssetRequest(() => deserializeAsset(asset, runtime, zip));
     });
 
     return assets;
@@ -1134,7 +1383,8 @@ const fixSporkCompatibility = function (blocks) {
 
         // For completeness with the above, set the argument reporter generators to be shadow: true as well.
         case 'argument_reporter_string_number':
-        case 'argument_reporter_boolean': {
+        case 'argument_reporter_boolean':
+        case 'argument_reporter_color': {
             const parent = blocks[block.parent];
             if (parent && parent.opcode === 'procedures_prototype') {
                 block.shadow = true;
@@ -1209,8 +1459,12 @@ const parseScratchObject = function (object, runtime, extensions, zip, assets) {
     const {costumePromises} = assets;
     // Sounds from JSON
     const {soundBank, soundPromises} = assets;
+    // Assets from JSON that are not a sound or a costume
+    const {assetPromises} = assets;
     // Create the first clone, and load its run-state from JSON.
     const target = sprite.createClone(object.isStage ? StageLayering.BACKGROUND_LAYER : StageLayering.SPRITE_LAYER);
+    if (typeof object.id === 'string') target._serializedTargetId = object.id;
+    if (typeof object.folderId === 'string') target.folderId = object.folderId;
     // Load target properties from JSON.
     if (Object.prototype.hasOwnProperty.call(object, 'tempo')) {
         target.tempo = object.tempo;
@@ -1260,6 +1514,19 @@ const parseScratchObject = function (object, runtime, extensions, zip, assets) {
             target.variables[newList.id] = newList;
         }
     }
+    if (Object.prototype.hasOwnProperty.call(object, 'tables')) {
+        for (const tableId in object.tables) {
+            const table = object.tables[tableId];
+            const newTable = new Variable(
+                tableId,
+                table[0],
+                Variable.TABLE_TYPE,
+                false
+            );
+            newTable.value = table[1];
+            target.variables[newTable.id] = newTable;
+        }
+    }
     if (Object.prototype.hasOwnProperty.call(object, 'broadcasts')) {
         for (const broadcastId in object.broadcasts) {
             const broadcast = object.broadcasts[broadcastId];
@@ -1285,12 +1552,19 @@ const parseScratchObject = function (object, runtime, extensions, zip, assets) {
                 comment.y,
                 comment.width,
                 comment.height,
-                comment.minimized
+                comment.minimized,
+                comment.colour
             );
             if (comment.blockId) {
                 newComment.blockId = comment.blockId;
             }
             target.comments[newComment.id] = newComment;
+        }
+    }
+    if (Object.prototype.hasOwnProperty.call(object, 'groups')) {
+        for (const groupId in object.groups) {
+            const newGroup = new Group(Object.assign({id: groupId}, object.groups[groupId]));
+            target.groups[newGroup.id] = newGroup;
         }
     }
     if (Object.prototype.hasOwnProperty.call(object, 'x')) {
@@ -1339,7 +1613,10 @@ const parseScratchObject = function (object, runtime, extensions, zip, assets) {
         // Make sure if soundBank is undefined, sprite.soundBank is then null.
         sprite.soundBank = soundBank || null;
     });
-    return Promise.all(costumePromises.concat(soundPromises)).then(() => target);
+    Promise.all(assetPromises).then(_assets => {
+        sprite.assets = _assets;
+    });
+    return Promise.all(costumePromises.concat(soundPromises).concat(assetPromises)).then(() => target);
 };
 
 const deserializeMonitor = function (monitorData, runtime, targets, extensions) {
@@ -1380,6 +1657,16 @@ const deserializeMonitor = function (monitorData, runtime, targets, extensions) 
         ) {
             monitorData.params.LIST = listTarget.variables[monitorData.id].name;
         }
+    } else if (monitorData.opcode === 'data_tablecontents') {
+        const tableTarget = monitorData.targetId ?
+            targets.find(t => t.id === monitorData.targetId) :
+            targets.find(t => t.isStage);
+        if (
+            tableTarget &&
+            Object.prototype.hasOwnProperty.call(tableTarget.variables, monitorData.id)
+        ) {
+            monitorData.params.TABLE = tableTarget.variables[monitorData.id].name;
+        }
     }
 
     // Convert the serialized monitorData params into the block fields structure
@@ -1395,7 +1682,10 @@ const deserializeMonitor = function (monitorData, runtime, targets, extensions) 
     // Variables, lists, and non-sprite-specific monitors, including any extension
     // monitors should already have the correct monitor ID serialized in the monitorData,
     // find the correct id for all other monitors.
-    if (monitorData.opcode !== 'data_variable' && monitorData.opcode !== 'data_listcontents' &&
+    if (
+        monitorData.opcode !== 'data_variable' &&
+        monitorData.opcode !== 'data_listcontents' &&
+        monitorData.opcode !== 'data_tablecontents' &&
         monitorBlockInfo && monitorBlockInfo.isSpriteSpecific) {
         monitorData.id = monitorBlockInfo.getId(
             monitorData.targetId, fields);
@@ -1444,6 +1734,10 @@ const deserializeMonitor = function (monitorData, runtime, targets, extensions) 
             const field = monitorBlock.fields.LIST;
             field.id = monitorData.id;
             field.variableType = Variable.LIST_TYPE;
+        } else if (monitorData.opcode === 'data_tablecontents') {
+            const field = monitorBlock.fields.TABLE;
+            field.id = monitorData.id;
+            field.variableType = Variable.TABLE_TYPE;
         }
 
         runtime.monitorBlocks.createBlock(monitorBlock);
@@ -1498,7 +1792,7 @@ const checkPlatformCompatibility = (json, runtime) => {
     }
 
     const projectPlatform = json.meta.platform.name;
-    if (projectPlatform === runtime.platform.name) {
+    if (projectPlatform === runtime.platform.name || projectPlatform === 'TurboWarp') {
         return;
     }
 
@@ -1527,6 +1821,89 @@ const checkPlatformCompatibility = (json, runtime) => {
  */
 const deserialize = async function (json, runtime, zip, isSingleSprite) {
     await checkPlatformCompatibility(json, runtime);
+
+    const allowedFolderKinds = ['sprite', 'costume', 'sound', 'asset'];
+    let importedFolders = [];
+    if (isSingleSprite) {
+        delete json.id;
+        delete json.folderId;
+        const folderIdMap = new Map();
+        const seenFolderIds = new Set();
+        const serializedFolders = [];
+        for (const folder of Array.isArray(json.folders) ? json.folders : []) {
+            if (!folder || typeof folder.id !== 'string' || !folder.id.trim() || seenFolderIds.has(folder.id) ||
+                typeof folder.name !== 'string' || !folder.name.trim() || !allowedFolderKinds.includes(folder.kind) ||
+                folder.kind === 'sprite') continue;
+            seenFolderIds.add(folder.id);
+            serializedFolders.push(folder);
+        }
+        serializedFolders.forEach(folder => folderIdMap.set(folder.id, uid()));
+        importedFolders = serializedFolders.map(folder => ({
+            id: folderIdMap.get(folder.id),
+            name: folder.name.trim(),
+            kind: folder.kind,
+            color: typeof folder.color === 'string' && /^#[0-9a-f]{6}$/i.test(folder.color) ?
+                folder.color.toLowerCase() : null,
+            scopeId: null,
+            parentId: folderIdMap.get(folder.parentId) || null,
+            _isOpen: folder.isOpen !== false
+        }));
+        importedFolders = makeFolderNamesUnique(importedFolders);
+        const importedFolderIds = new Set(importedFolders.map(folder => folder.id));
+        normalizeFolderParents(importedFolders);
+        for (const [kind, collectionName] of [
+            ['costume', 'costumes'],
+            ['sound', 'sounds'],
+            ['asset', 'assets']
+        ]) {
+            for (const item of json[collectionName] || []) {
+                const folder = serializedFolders.find(candidate =>
+                    candidate.id === item.folderId && candidate.kind === kind
+                );
+                if (folder && importedFolderIds.has(folderIdMap.get(folder.id))) {
+                    item.folderId = folderIdMap.get(folder.id);
+                } else delete item.folderId;
+            }
+        }
+        const nonEmptyFolderIds = new Set();
+        for (const collectionName of ['costumes', 'sounds', 'assets']) {
+            for (const item of json[collectionName] || []) {
+                if (item.folderId) nonEmptyFolderIds.add(item.folderId);
+            }
+        }
+        let foundParent = true;
+        while (foundParent) {
+            foundParent = false;
+            for (const folder of importedFolders) {
+                if (nonEmptyFolderIds.has(folder.id) && folder.parentId &&
+                    !nonEmptyFolderIds.has(folder.parentId)) {
+                    nonEmptyFolderIds.add(folder.parentId);
+                    foundParent = true;
+                }
+            }
+        }
+        importedFolders = importedFolders.filter(folder => nonEmptyFolderIds.has(folder.id));
+    } else {
+        // Project deserialization owns replacing the runtime's folder state.
+        // eslint-disable-next-line require-atomic-updates
+        runtime.projectFolders = Array.isArray(json.folders) ? json.folders
+            .filter(folder => folder && typeof folder.id === 'string' && typeof folder.name === 'string' &&
+                allowedFolderKinds.includes(folder.kind))
+            .map(folder => ({
+                id: folder.id,
+                name: folder.name.trim(),
+                kind: folder.kind,
+                color: typeof folder.color === 'string' && /^#[0-9a-f]{6}$/i.test(folder.color) ?
+                    folder.color.toLowerCase() : null,
+                scopeId: typeof folder.scopeId === 'string' ? folder.scopeId : null,
+                parentId: typeof folder.parentId === 'string' ? folder.parentId : null,
+                _isOpen: folder.isOpen !== false
+            })) : [];
+        const parsedProjectOptions = json.projectOptions ? ExtendedJSON.parse(json.projectOptions) : null;
+        if (typeof runtime._storedProjectOptions === 'undefined' || runtime._storedProjectOptions === null) {
+            runtime._storedProjectOptions = parsedProjectOptions;
+        }
+    }
 
     const extensions = {
         extensionIDs: new Set(),
@@ -1591,6 +1968,7 @@ const deserialize = async function (json, runtime, zip, isSingleSprite) {
             }))
         .then(targets => replaceUnsafeCharsInVariableIds(targets))
         .then(targets => {
+            if (!isSingleSprite) normalizeProjectFolders(runtime, targets);
             monitorObjects.map(monitorDesc => deserializeMonitor(monitorDesc, runtime, targets, extensions));
             if (Object.prototype.hasOwnProperty.call(json, 'extensionStorage')) {
                 runtime.extensionStorage = json.extensionStorage;
@@ -1599,7 +1977,8 @@ const deserialize = async function (json, runtime, zip, isSingleSprite) {
         })
         .then(targets => ({
             targets,
-            extensions
+            extensions,
+            folders: importedFolders
         }));
 };
 

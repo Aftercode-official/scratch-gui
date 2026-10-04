@@ -1219,6 +1219,9 @@ const parseBlock = function (sb2block, addBroadcastMsg, getVariableId, extension
             } else if (expectedArg.fieldName === 'LIST') {
                 // Add `id` property to variable fields
                 activeBlock.fields[expectedArg.fieldName].id = getVariableId(providedArg, Variable.LIST_TYPE);
+            } else if (expectedArg.fieldName === 'TABLE') {
+                // Add `id` property to variable fields
+                activeBlock.fields[expectedArg.fieldName].id = getVariableId(providedArg, Variable.TABLE_TYPE);
             } else if (expectedArg.fieldName === 'BROADCAST_OPTION') {
                 // Add the name in this field to the broadcast msg name map.
                 // Also need to provide the fields[fieldName] object,
