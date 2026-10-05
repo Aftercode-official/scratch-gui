@@ -66,7 +66,11 @@ const Credits = () => (
         </section>
        <section>
             <h2>Developer</h2>
-            <UserList users={UserData.developers} />
+            <UserList users={UserData.DANV} />
+        </section>
+        <section>
+            <h2>Special Thanks</h2>
+            <UserList users={UserData.Github} />
         </section>
         {APP_NAME !== 'TurboWarp' && (
             // Be kind and considerate. Don't remove this :)

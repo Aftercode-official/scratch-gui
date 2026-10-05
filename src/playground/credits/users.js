@@ -20,23 +20,38 @@ const fromHardcoded = ({userID = '0', username}) => {
 };
 
 // The lists below are in no particular order.
-const developers = [
+const DANV = [
     {
-        userID: '139855183',
-        username: 'katboizz'
+        text:'katboizz',
+        image: `https://trampoline.turbowarp.org/avatars/139855183`,
+        href: `https://scratch.mit.edu/users/katboizz/`,
     },
-].map(fromHardcoded);
+    {
+        text:'_kitty-the-cat_',
+        image: `https://trampoline.turbowarp.org/avatars/160325509`,
+        href: `https://scratch.mit.edu/users/_kitty-the-cat_/`,
+    },
+    {
+        text:'DANV',
+        image: `https://i.ibb.co/QFg1cVVD/image.png`,
+        href: `https://turbows.pages.dev/users/StudioDANV/`,
+    },
+];
 
-const specialThanks = [
+const Github = [
     {
-        userID: '165599831',
-        username: 'VN-Scratch-Protector'
+        text: "Nitro-Bolt",
+        image: `https://github.com/Nitro-Bolt.png`,
+        href: `https://github.com/Nitro-Bolt/`,
     },
+
     {
-        userID: '160325509',
-        username: '_kitty-the-cat_'
-    },
-].map(fromHardcoded);
+        text: "TurboWarp",
+        image: `https://github.com/TurboWarp.png`,
+        href: `https://github.com/TurboWarp/`,
+    }
+
+];
 
 const contributors = [
     {
@@ -399,10 +414,10 @@ const docs = [
 ].map(fromHardcoded);
 
 export default {
-    developers: shuffle(developers),
-    specialThanks: shuffle(specialThanks),
     contributors: shuffle(contributors),
     addonDevelopers: shuffle(addonDevelopers),
     extensionDevelopers: shuffle(extensionDevelopers),
-    docs: shuffle(docs)
+    docs: shuffle(docs),
+    Github: shuffle(Github),
+    DANV: shuffle(DANV)
 };
