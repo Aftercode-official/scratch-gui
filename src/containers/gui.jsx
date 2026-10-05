@@ -15,7 +15,8 @@ import {
     activateTab,
     BLOCKS_TAB_INDEX,
     COSTUMES_TAB_INDEX,
-    SOUNDS_TAB_INDEX
+    SOUNDS_TAB_INDEX,
+    ASSETS_TAB_INDEX
 } from '../reducers/editor-tab';
 
 import {
@@ -24,6 +25,8 @@ import {
     closeTelemetryModal,
     openExtensionLibrary
 } from '../reducers/modals';
+import {setProjectAssets} from '../reducers/project-assets';
+import {setProjectChanged} from '../reducers/project-changed';
 
 import FontLoaderHOC from '../lib/font-loader-hoc.jsx';
 import LocalizationHOC from '../lib/localization-hoc.jsx';
@@ -59,8 +62,16 @@ class GUI extends React.Component {
         this.props.onStorageInit(storage);
         this.props.onVmInit(this.props.vm);
         setProjectIdMetadata(this.props.projectId);
+        this.props.vm.runtime.extensionStorage.assets = this.props.projectAssets;
+        this.props.vm.runtime.on('PROJECT_ASSETS_UPDATED', this.props.onProjectAssetsUpdated);
     }
     componentDidUpdate (prevProps) {
+        if (
+            this.props.projectAssets !== prevProps.projectAssets ||
+            (this.props.isShowingProject && !prevProps.isShowingProject)
+        ) {
+            this.props.vm.runtime.extensionStorage.assets = this.props.projectAssets;
+        }
         if (this.props.projectId !== prevProps.projectId) {
             if (this.props.projectId !== null) {
                 this.props.onUpdateProjectId(this.props.projectId);
@@ -72,6 +83,9 @@ class GUI extends React.Component {
             // At this time the project view in www doesn't need to know when a project is unloaded
             this.props.onProjectLoaded();
         }
+    }
+    componentWillUnmount () {
+        this.props.vm.runtime.off('PROJECT_ASSETS_UPDATED', this.props.onProjectAssetsUpdated);
     }
     render () {
         if (this.props.isError) {
@@ -89,6 +103,7 @@ class GUI extends React.Component {
             onStorageInit,
             onUpdateProjectId,
             onVmInit,
+            projectAssets,
             projectHost,
             projectId,
             /* eslint-enable no-unused-vars */
@@ -125,10 +140,12 @@ GUI.propTypes = {
     isTotallyNormal: PropTypes.bool,
     loadingStateVisible: PropTypes.bool,
     onProjectLoaded: PropTypes.func,
+    onProjectAssetsUpdated: PropTypes.func,
     onSeeCommunity: PropTypes.func,
     onStorageInit: PropTypes.func,
     onUpdateProjectId: PropTypes.func,
     onVmInit: PropTypes.func,
+    projectAssets: PropTypes.arrayOf(PropTypes.object),
     projectHost: PropTypes.string,
     projectId: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
     telemetryModalVisible: PropTypes.bool,
@@ -140,6 +157,7 @@ GUI.defaultProps = {
     isTotallyNormal: false,
     onStorageInit: storageInstance => storageInstance.addOfficialScratchWebStores(),
     onProjectLoaded: () => {},
+    onProjectAssetsUpdated: () => {},
     onUpdateProjectId: () => {},
     onVmInit: (/* vm */) => {}
 };
@@ -164,7 +182,9 @@ const mapStateToProps = state => {
         isShowingProject: getIsShowingProject(loadingState),
         loadingStateVisible: state.scratchGui.modals.loadingProject,
         projectId: state.scratchGui.projectState.projectId,
+        projectAssets: state.scratchGui.projectAssets,
         soundsTabVisible: state.scratchGui.editorTab.activeTabIndex === SOUNDS_TAB_INDEX,
+        assetsTabVisible: state.scratchGui.editorTab.activeTabIndex === ASSETS_TAB_INDEX,
         targetIsStage: (
             state.scratchGui.targets.stage &&
             state.scratchGui.targets.stage.id === state.scratchGui.targets.editingTarget
@@ -190,7 +210,11 @@ const mapDispatchToProps = dispatch => ({
     onActivateSoundsTab: () => dispatch(activateTab(SOUNDS_TAB_INDEX)),
     onRequestCloseBackdropLibrary: () => dispatch(closeBackdropLibrary()),
     onRequestCloseCostumeLibrary: () => dispatch(closeCostumeLibrary()),
-    onRequestCloseTelemetryModal: () => dispatch(closeTelemetryModal())
+    onRequestCloseTelemetryModal: () => dispatch(closeTelemetryModal()),
+    onProjectAssetsUpdated: assets => {
+        dispatch(setProjectAssets(assets));
+        dispatch(setProjectChanged());
+    }
 });
 
 const ConnectedGUI = injectIntl(connect(

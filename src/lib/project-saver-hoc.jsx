@@ -9,6 +9,7 @@ import log from '../lib/log';
 import storage from '../lib/storage';
 import dataURItoBlob from '../lib/data-uri-to-blob';
 import saveProjectToServer from '../lib/save-project-to-server';
+import {addAssetsToProjectJSON} from './project-assets';
 
 import {
     showAlertWithTimeout,
@@ -225,7 +226,10 @@ const ProjectSaverHOC = function (WrappedComponent) {
             // while in the process of saving a project (e.g. the
             // serialized project refers to a newer asset than what
             // we just finished saving).
-            const savedVMState = this.props.vm.toJSON();
+            const savedVMState = addAssetsToProjectJSON(
+                this.props.vm.toJSON(),
+                this.props.projectAssets
+            );
             return Promise.all(this.props.vm.assets
                 .filter(asset => !asset.clean)
                 .map(
@@ -392,6 +396,7 @@ const ProjectSaverHOC = function (WrappedComponent) {
         onUpdateProjectThumbnail: PropTypes.func,
         onUpdatedProject: PropTypes.func,
         projectChanged: PropTypes.bool,
+        projectAssets: PropTypes.arrayOf(PropTypes.object),
         reduxProjectId: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
         reduxProjectTitle: PropTypes.string,
         setAutoSaveTimeoutId: PropTypes.func.isRequired,
@@ -422,6 +427,7 @@ const ProjectSaverHOC = function (WrappedComponent) {
             loadingState: loadingState,
             locale: state.locales.locale,
             projectChanged: state.scratchGui.projectChanged,
+            projectAssets: state.scratchGui.projectAssets,
             reduxProjectId: state.scratchGui.projectState.projectId,
             reduxProjectTitle: state.scratchGui.projectTitle,
             vm: state.scratchGui.vm

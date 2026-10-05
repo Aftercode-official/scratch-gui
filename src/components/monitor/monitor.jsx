@@ -10,6 +10,7 @@ import DefaultMonitor from './default-monitor.jsx';
 import LargeMonitor from './large-monitor.jsx';
 import SliderMonitor from '../../containers/slider-monitor.jsx';
 import ListMonitor from '../../containers/list-monitor.jsx';
+import TableMonitor from './table-monitor.jsx';
 import {Theme} from '../../lib/themes/index.js';
 
 import styles from './monitor.css';
@@ -29,7 +30,8 @@ const modes = {
     default: DefaultMonitor,
     large: LargeMonitor,
     slider: SliderMonitor,
-    list: ListMonitor
+    list: ListMonitor,
+    table: TableMonitor
 };
 
 const getCategoryColor = (theme, category) => {
@@ -60,7 +62,7 @@ const MonitorComponent = props => (
             <Box
                 className={styles.monitorContainer}
                 componentRef={props.componentRef}
-                onDoubleClick={props.mode === 'list' || !props.draggable ? null : props.onNextMode}
+                onDoubleClick={props.mode === 'list' || props.mode === 'table' || !props.draggable ? null : props.onNextMode}
                 data-id={props.id}
                 data-opcode={props.opcode}
             >

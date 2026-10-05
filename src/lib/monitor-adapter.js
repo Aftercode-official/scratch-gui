@@ -18,7 +18,8 @@ const isUndefined = a => typeof a === 'undefined';
 export default function ({id, mode, spriteName, opcode, params, value, vm}) {
     // Extension monitors get their labels from the Runtime through `getLabelForOpcode`.
     // Other monitors' labels are hard-coded in `OpcodeLabels`.
-    let {label, category, labelFn} = (vm && vm.runtime.getLabelForOpcode(opcode)) || OpcodeLabels.getLabel(opcode);
+    let {label, category, color, labelFn} =
+        (vm && vm.runtime.getLabelForOpcode(opcode)) || OpcodeLabels.getLabel(opcode);
 
     // Use labelFn if provided for dynamic labelling (e.g. variables)
     if (!isUndefined(labelFn)) label = labelFn(params);
@@ -35,9 +36,9 @@ export default function ({id, mode, spriteName, opcode, params, value, vm}) {
 
     // Convert scalars to a string now. That should help avoid unnecessary re-renders in a few edge cases.
     // For lists, we stringify when we display the list row instead of doing a full list copy on every change.
-    if (mode !== 'list') {
+    if (mode !== 'list' && mode !== 'table') {
         value = safeStringify(value);
     }
 
-    return {id, label, category, value};
+    return {id, label, category, color, value};
 }

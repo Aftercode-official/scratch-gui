@@ -6,6 +6,8 @@ import {connect} from 'react-redux';
 import log from '../lib/log';
 import sharedMessages from './shared-messages';
 import {setFileHandle, setProjectError} from '../reducers/tw';
+import {setProjectAssets} from '../reducers/project-assets';
+import {getProjectAssets} from './project-assets';
 
 import {
     LoadingStates,
@@ -199,7 +201,14 @@ const SBFileUploaderHOC = function (WrappedComponent) {
                 let loadingSuccess = false;
                 // tw: stop when loading new project
                 this.props.vm.quit();
-                this.props.vm.loadProject(this.fileReader.result)
+                const projectAssetsPromise = filename && filename.toLowerCase().endsWith('.sb3') ?
+                    getProjectAssets(this.fileReader.result) :
+                    Promise.resolve([]);
+                projectAssetsPromise
+                    .then(assets => this.props.vm.loadProject(this.fileReader.result)
+                        .then(() => {
+                            this.props.onSetProjectAssets(assets);
+                        }))
                     .then(() => {
                         if (filename) {
                             const uploadedProjectTitle = this.getProjectTitleFromFilename(filename);
@@ -323,6 +332,7 @@ const SBFileUploaderHOC = function (WrappedComponent) {
         // show project loading screen
         onLoadingStarted: () => dispatch(openLoadingProject()),
         onSetProjectTitle: title => dispatch(setProjectTitle(title)),
+        onSetProjectAssets: assets => dispatch(setProjectAssets(assets)),
         // step 4: transition the project state so we're ready to handle the new
         // project data. When this is done, the project state transition will be
         // noticed by componentDidUpdate()

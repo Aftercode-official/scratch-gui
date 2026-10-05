@@ -7,6 +7,7 @@ import React from 'react';
 import {intlShape, injectIntl, defineMessages} from 'react-intl';
 import VMScratchBlocks from '../lib/blocks';
 import VM from 'scratch-vm';
+import enMsgs from 'scratch-blocks/msg/json/en.json';
 
 import log from '../lib/log.js';
 import Prompt from './prompt.jsx';
@@ -169,6 +170,9 @@ class Blocks extends React.Component {
         this.ScratchBlocks.ScratchMsgs.setLocale(this.props.locale);
 
         const Msg = this.ScratchBlocks.Msg;
+        for (const key of Object.keys(enMsgs)) {
+            if (!(key in Msg)) Msg[key] = enMsgs[key];
+        }
         Msg.PROCEDURES_RETURN = this.props.intl.formatMessage(messages.PROCEDURES_RETURN, {
             v: '%1'
         });
@@ -192,6 +196,7 @@ class Blocks extends React.Component {
         workspaceConfig.toolboxPosition = this.state.toolboxPosition === 'top' ? 'start' : this.state.toolboxPosition;
         workspaceConfig.comments = true;
         this.workspace = this.ScratchBlocks.inject(this.blocks, workspaceConfig);
+        this.workspace.options.vm = this.props.vm;
         AddonHooks.blocklyWorkspace = this.workspace;
 
         // Register buttons under new callback keys for creating variables,
@@ -345,8 +350,11 @@ class Blocks extends React.Component {
             this.updateToolbox();
         }, 0);
     }
-    setLocale () {
+        setLocale () {
         this.ScratchBlocks.ScratchMsgs.setLocale(this.props.locale);
+        for (const key of Object.keys(enMsgs)) {
+            if (!(key in this.ScratchBlocks.Msg)) this.ScratchBlocks.Msg[key] = enMsgs[key];
+        }
         this.props.vm.setLocale(this.props.locale, this.props.messages)
             .then(() => {
                 if (this.unmounted) return;
@@ -497,10 +505,16 @@ class Blocks extends React.Component {
                 this.props.vm.runtime.getBlocksXML(target),
                 this.props.theme
             );
-            return makeToolboxXML(false, target.isStage, target.id, dynamicBlocksXML,
+                return makeToolboxXML(
+                this.props.vm,
+                false,
+                target.isStage,
+                target.id,
+                dynamicBlocksXML,
                 targetCostumes[targetCostumes.length - 1].name,
                 stageCostumes[stageCostumes.length - 1].name,
                 targetSounds.length > 0 ? targetSounds[targetSounds.length - 1].name : '',
+                '', // assetName
                 this.props.theme.getBlockColors()
             );
         } catch {

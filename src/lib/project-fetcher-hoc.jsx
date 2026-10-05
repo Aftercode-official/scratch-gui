@@ -5,6 +5,7 @@ import bindAll from 'lodash.bindall';
 import {connect} from 'react-redux';
 
 import {setProjectUnchanged} from '../reducers/project-changed';
+import {setProjectAssets} from '../reducers/project-assets';
 import {
     LoadingStates,
     getIsCreatingNew,
@@ -26,6 +27,7 @@ import {ProjectUnsharedError, ProjectFetchError} from './tw-load-project-error';
 
 import VM from 'scratch-vm';
 import {fetchProjectMeta} from './tw-project-meta-fetcher-hoc.jsx';
+import {getProjectAssets} from './project-assets';
 
 // TW: Temporary hack for project tokens
 const fetchProjectToken = async projectId => {
@@ -142,7 +144,10 @@ const ProjectFetcherHOC = function (WrappedComponent) {
             return assetPromise
                 .then(projectAsset => {
                     if (projectAsset) {
-                        this.props.onFetchedProjectData(projectAsset.data, loadingState);
+                        return getProjectAssets(projectAsset.data).then(assets => {
+                            this.props.onSetProjectAssets(assets);
+                            this.props.onFetchedProjectData(projectAsset.data, loadingState);
+                        });
                     } else if (projectUrl) {
                         // Treat failure to load as an error
                         // Throw to be caught by catch later on
@@ -199,6 +204,7 @@ const ProjectFetcherHOC = function (WrappedComponent) {
         onError: PropTypes.func,
         onFetchedProjectData: PropTypes.func,
         onProjectUnchanged: PropTypes.func,
+        onSetProjectAssets: PropTypes.func,
         projectHost: PropTypes.string,
         projectToken: PropTypes.string,
         projectId: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
@@ -226,7 +232,8 @@ const ProjectFetcherHOC = function (WrappedComponent) {
         onFetchedProjectData: (projectData, loadingState) =>
             dispatch(onFetchedProjectData(projectData, loadingState)),
         setProjectId: projectId => dispatch(setProjectId(projectId)),
-        onProjectUnchanged: () => dispatch(setProjectUnchanged())
+        onProjectUnchanged: () => dispatch(setProjectUnchanged()),
+        onSetProjectAssets: assets => dispatch(setProjectAssets(assets))
     });
     // Allow incoming props to override redux-provided props. Used to mock in tests.
     const mergeProps = (stateProps, dispatchProps, ownProps) => Object.assign(

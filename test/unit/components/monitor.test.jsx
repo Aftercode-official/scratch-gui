@@ -2,6 +2,7 @@ import React from 'react';
 import {shallow} from 'enzyme';
 import DefaultMonitor from '../../../src/components/monitor/default-monitor';
 import Monitor from '../../../src/components/monitor/monitor';
+import TableMonitor from '../../../src/components/monitor/table-monitor';
 import {DARK_THEME, DEFAULT_THEME} from '../../../src/lib/themes';
 
 jest.mock('../../../src/lib/themes/default');
@@ -52,5 +53,26 @@ describe('Monitor Component', () => {
 
         // selects colors from mock value in src/lib/themes/__mocks__/dark-mode.js
         expect(defaultMonitor.props().categoryColor).toEqual({background: '#AAAAAA', text: '#BBBBBB'});
+    });
+
+    test('it renders table monitors with the table component', () => {
+        const noop = () => {};
+
+        const wrapper = shallow(<Monitor
+            category="data"
+            // eslint-disable-next-line react/jsx-no-bind
+            componentRef={noop}
+            draggable={false}
+            label="My table"
+            mode="table"
+            // eslint-disable-next-line react/jsx-no-bind
+            onDragEnd={noop}
+            // eslint-disable-next-line react/jsx-no-bind
+            onNextMode={noop}
+            theme={DEFAULT_THEME}
+            value={[[1, 2]]}
+        />);
+
+        expect(wrapper.find(TableMonitor)).toHaveLength(1);
     });
 });

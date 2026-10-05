@@ -132,6 +132,16 @@ export default function (vm) {
         return sprites;
     };
 
+    const assetsSpriteMenu = function () {
+        const sprites = [];
+        for (const target of vm.runtime.targets) {
+            if (target.isOriginal && !target.isStage && target !== vm.editingTarget) {
+                sprites.push([target.sprite.name, target.sprite.name]);
+            }
+        }
+        return sprites;
+    };
+
     const cloneMenu = function () {
         if (vm.editingTarget && vm.editingTarget.isStage) {
             const menu = spriteMenu();
@@ -155,6 +165,24 @@ export default function (vm) {
     const controlColors = ScratchBlocks.Colours.control;
 
     const eventColors = ScratchBlocks.Colours.event;
+
+    const assetsColors = ScratchBlocks.Colours.assets;
+
+    if (ScratchBlocks.Blocks.assets_sprite_menu) {
+        ScratchBlocks.Blocks.assets_sprite_menu.init = function () {
+            const myself = ScratchBlocks.ScratchMsgs.translate(
+                'CONTROL_CREATECLONEOF_MYSELF',
+                'myself'
+            );
+            const stage = ScratchBlocks.ScratchMsgs.translate('SENSING_OF_STAGE', 'Stage');
+            const json = jsonForMenuBlock('SPRITE_OPTION', assetsSpriteMenu, assetsColors, [
+                [myself, '_myself_'],
+                [stage, 'Stage']
+            ]);
+            json.extensions = ['colours_assets', 'output_string'];
+            this.jsonInit(json);
+        };
+    }
 
     ScratchBlocks.Blocks.sound_sounds_menu.init = function () {
         const json = jsonForMenuBlock('SOUND_MENU', soundsMenu, soundColors, []);

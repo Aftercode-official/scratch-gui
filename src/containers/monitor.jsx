@@ -14,15 +14,19 @@ import SliderPrompt from './slider-prompt.jsx';
 
 import {connect} from 'react-redux';
 import VM from 'scratch-vm';
+import {getEventXY} from '../lib/touch-utils';
 
 const availableModes = opcode => (
     monitorModes.filter(t => {
-        if (opcode === 'data_variable') {
-            return t !== 'list';
-        } else if (opcode === 'data_listcontents') {
+        switch (opcode) {
+        case 'data_variable':
+            return t !== 'list' && t !== 'table';
+        case 'data_listcontents':
             return t === 'list';
+        case 'data_tablecontents':
+            return t === 'table';
         }
-        return t !== 'slider' && t !== 'list';
+        return t !== 'slider' && t !== 'list' && t !== 'table';
     })
 );
 
@@ -49,10 +53,15 @@ class Monitor extends React.Component {
             'handleSliderPromptOpen',
             'handleImport',
             'handleExport',
+            'handleAddTableRow',
+            'handleAddTableColumn',
+            'handleEditTableCell',
+            'handleTableResizeMouseDown',
             'setElement'
         ]);
         this.state = {
-            sliderPrompt: false
+            sliderPrompt: false,
+            tableSize: null
         };
     }
     componentDidMount () {
@@ -103,8 +112,19 @@ class Monitor extends React.Component {
             return;
         }
         this.props.resizeMonitorRect(this.props.id, this.element.offsetWidth, this.element.offsetHeight);
+        if (
+            this.state.tableSize &&
+            this.props.width === this.state.tableSize.width &&
+            this.props.height === this.state.tableSize.height
+        ) {
+            this.setState({tableSize: null});
+        }
     }
     componentWillUnmount () {
+        if (this.tableResizeHandlers) {
+            window.removeEventListener('mousemove', this.tableResizeHandlers.onMouseMove);
+            window.removeEventListener('mouseup', this.tableResizeHandlers.onMouseUp);
+        }
         this.props.removeMonitorRect(this.props.id);
     }
     handleDragEnd (e, {x, y}) {
@@ -176,35 +196,148 @@ class Monitor extends React.Component {
     }
     handleImport () {
         importCSV().then(async ({rows, text}) => {
-            const numberOfColumns = rows[0].length;
-            let columnNumber = 1;
-            if (numberOfColumns > 1) {
-                const msg = this.props.intl.formatMessage(messages.columnPrompt, {numberOfColumns});
-                // prompt() returns Promise in desktop app
-                columnNumber = parseInt(await prompt(msg), 10); // eslint-disable-line no-alert
-            }
-            let newListValue;
-            if (isNaN(columnNumber) || numberOfColumns === 1) {
-                newListValue = text.replace(/\r/g, '').split('\n');
-            } else {
-                newListValue = rows.map(row => row[columnNumber - 1])
-                    .filter(item => typeof item === 'string'); // CSV importer can leave undefineds
-            }
             const {vm, targetId, id: variableId} = this.props;
-            setVariableValue(vm, targetId, variableId, newListValue);
+            if (this.props.mode === 'table') {
+                // For tables, use the entire 2D array
+                this.setTableValue(rows);
+            } else {
+                // For lists, extract a single column
+                const numberOfColumns = rows[0].length;
+                let columnNumber = 1;
+                if (numberOfColumns > 1) {
+                    const msg = this.props.intl.formatMessage(messages.columnPrompt, {numberOfColumns});
+                    // prompt() returns Promise in desktop app
+                    columnNumber = parseInt(await prompt(msg), 10); // eslint-disable-line no-alert
+                }
+                let newListValue;
+                if (isNaN(columnNumber) || numberOfColumns === 1) {
+                    newListValue = text.replace(/\r/g, '').split('\n');
+                } else {
+                    newListValue = rows.map(row => row[columnNumber - 1])
+                        .filter(item => typeof item === 'string'); // CSV importer can leave undefineds
+                }
+                setVariableValue(vm, targetId, variableId, newListValue);
+            }
         });
     }
     handleExport () {
         const {vm, targetId, id: variableId} = this.props;
         const variable = getVariable(vm, targetId, variableId);
-        const text = variable.value.join('\r\n');
-        const blob = new Blob([text], {type: 'text/plain;charset=utf-8'});
-        downloadBlob(`${variable.name}.txt`, blob);
+        if (this.props.mode === 'table') {
+            // For tables, export as CSV with rows and columns
+            const text = variable.value.map(row => {
+                if (Array.isArray(row)) {
+                    return row.join(',');
+                }
+                return row;
+            }).join('\r\n');
+            const blob = new Blob([text], {type: 'text/csv;charset=utf-8'});
+            downloadBlob(`${variable.name}.csv`, blob);
+        } else {
+            // For lists, export as newline-separated text
+            const text = variable.value.join('\r\n');
+            const blob = new Blob([text], {type: 'text/plain;charset=utf-8'});
+            downloadBlob(`${variable.name}.txt`, blob);
+        }
+    }
+    handleAddTableRow () {
+        const {vm, targetId, id: tableId} = this.props;
+        const table = getVariable(vm, targetId, tableId);
+        const rows = Array.isArray(table.value) ? table.value : [];
+        const columnCount = rows.reduce(
+            (count, row) => Math.max(count, Array.isArray(row) ? row.length : 0),
+            0
+        );
+        const width = columnCount || 1;
+        const newRows = rows.map(row => {
+            const cells = Array.isArray(row) ? row : [row];
+            return [...cells, ...Array(Math.max(0, width - cells.length)).fill('')];
+        });
+        newRows.push(Array(width).fill(''));
+        this.setTableValue(newRows);
+    }
+    handleAddTableColumn () {
+        const {vm, targetId, id: tableId} = this.props;
+        const table = getVariable(vm, targetId, tableId);
+        const rows = Array.isArray(table.value) ? table.value : [];
+        const width = rows.reduce(
+            (count, row) => Math.max(count, Array.isArray(row) ? row.length : 1),
+            0
+        );
+        const newRows = rows.length === 0 ?
+            [['']] :
+            rows.map(row => {
+                const cells = Array.isArray(row) ? row : [row];
+                return [...cells, ...Array(Math.max(0, width - cells.length)).fill(''), ''];
+            });
+        this.setTableValue(newRows);
+    }
+    setTableValue (value) {
+        const table = getVariable(this.props.vm, this.props.targetId, this.props.id);
+        setVariableValue(this.props.vm, this.props.targetId, this.props.id, value);
+        table._monitorUpToDate = false;
+    }
+    handleEditTableCell (rowIndex, columnIndex, value) {
+        const table = getVariable(this.props.vm, this.props.targetId, this.props.id);
+        const rows = Array.isArray(table.value) ? table.value : [];
+        const newRows = rows.map(row => (Array.isArray(row) ? row.slice() : [row]));
+        if (newRows[rowIndex]) {
+            while (newRows[rowIndex].length <= columnIndex) {
+                newRows[rowIndex].push('');
+            }
+            newRows[rowIndex][columnIndex] = value;
+            this.setTableValue(newRows);
+        }
+    }
+    handleTableResizeMouseDown (event) {
+        event.preventDefault();
+        const start = getEventXY(event);
+        const startWidth = this.state.tableSize ?
+            this.state.tableSize.width :
+            (this.props.width || 200);
+        const startHeight = this.state.tableSize ?
+            this.state.tableSize.height :
+            (this.props.height || 200);
+        const stageWidth = this.props.customStageSize && this.props.customStageSize.width;
+        const stageHeight = this.props.customStageSize && this.props.customStageSize.height;
+        const getSize = moveEvent => {
+            const position = getEventXY(moveEvent);
+            return {
+                width: Math.max(100, Math.min(
+                    startWidth + position.x - start.x,
+                    stageWidth || startWidth + position.x - start.x
+                )),
+                height: Math.max(60, Math.min(
+                    startHeight + position.y - start.y,
+                    stageHeight || startHeight + position.y - start.y
+                ))
+            };
+        };
+        const onMouseMove = moveEvent => {
+            this.setState({tableSize: getSize(moveEvent)});
+        };
+        const onMouseUp = moveEvent => {
+            const size = getSize(moveEvent);
+            this.setState({tableSize: size});
+            this.props.vm.runtime.requestUpdateMonitor({
+                id: this.props.id,
+                width: size.width,
+                height: size.height
+            });
+            window.removeEventListener('mousemove', onMouseMove);
+            window.removeEventListener('mouseup', onMouseUp);
+            this.tableResizeHandlers = null;
+        };
+        this.tableResizeHandlers = {onMouseMove, onMouseUp};
+        window.addEventListener('mousemove', onMouseMove);
+        window.addEventListener('mouseup', onMouseUp);
     }
     render () {
         const monitorProps = monitorAdapter(this.props);
         const showSliderOption = availableModes(this.props.opcode).indexOf('slider') !== -1;
         const isList = this.props.mode === 'list';
+        const isTable = this.props.mode === 'table';
+        const isEditableList = isList && this.props.opcode === 'data_listcontents';
         return (
             <React.Fragment>
                 {this.state.sliderPrompt && <SliderPrompt
@@ -226,14 +359,24 @@ class Monitor extends React.Component {
                     mode={this.props.mode}
                     targetId={this.props.targetId}
                     theme={this.props.theme}
-                    width={this.props.width}
+                    width={isTable && this.state.tableSize ?
+                        this.state.tableSize.width :
+                        this.props.width}
+                    height={isTable && this.state.tableSize ?
+                        this.state.tableSize.height :
+                        this.props.height}
                     onDragEnd={this.handleDragEnd}
-                    onExport={isList ? this.handleExport : null}
-                    onImport={isList ? this.handleImport : null}
+                    editable={isEditableList || isTable}
+                    onExport={(isEditableList || isTable) ? this.handleExport : null}
+                    onImport={(isEditableList || isTable) ? this.handleImport : null}
+                    onAddRow={isTable ? this.handleAddTableRow : null}
+                    onAddColumn={isTable ? this.handleAddTableColumn : null}
+                    onEditCell={isTable ? this.handleEditTableCell : null}
+                    onResizeMouseDown={isTable ? this.handleTableResizeMouseDown : null}
                     onHide={this.handleHide}
                     onNextMode={this.handleNextMode}
-                    onSetModeToDefault={isList ? null : this.handleSetModeToDefault}
-                    onSetModeToLarge={isList ? null : this.handleSetModeToLarge}
+                    onSetModeToDefault={(isList || isTable) ? null : this.handleSetModeToDefault}
+                    onSetModeToLarge={(isList || isTable) ? null : this.handleSetModeToLarge}
                     onSetModeToSlider={showSliderOption ? this.handleSetModeToSlider : null}
                     onSliderPromptOpen={this.handleSliderPromptOpen}
                 />
@@ -251,7 +394,7 @@ Monitor.propTypes = {
     isDiscrete: PropTypes.bool,
     max: PropTypes.number,
     min: PropTypes.number,
-    mode: PropTypes.oneOf(['default', 'slider', 'large', 'list']),
+    mode: PropTypes.oneOf(['default', 'slider', 'large', 'list', 'table']),
     monitorLayout: PropTypes.shape({
         monitors: PropTypes.object, // eslint-disable-line react/forbid-prop-types
         savedMonitorPositions: PropTypes.object // eslint-disable-line react/forbid-prop-types
@@ -271,12 +414,22 @@ Monitor.propTypes = {
         PropTypes.arrayOf(PropTypes.oneOfType([
             PropTypes.string,
             PropTypes.number
-        ]))
+        ])),
+        PropTypes.arrayOf(
+            PropTypes.arrayOf(
+                PropTypes.oneOfType([
+                    PropTypes.number,
+                    PropTypes.string
+                ])))
     ]), // eslint-disable-line react/no-unused-prop-types
     vm: PropTypes.instanceOf(VM),
     width: PropTypes.number,
     x: PropTypes.number,
-    y: PropTypes.number
+    y: PropTypes.number,
+    customStageSize: PropTypes.shape({
+        width: PropTypes.number,
+        height: PropTypes.number
+    })
 };
 Monitor.defaultProps = {
     theme: Theme.light
@@ -286,7 +439,8 @@ const mapStateToProps = state => ({
     theme: state.scratchGui.theme.theme,
     // render on toolbox updates since changes to the blocks could affect monitor labels, i.e. updated locale
     toolboxXML: state.scratchGui.toolbox.toolboxXML,
-    vm: state.scratchGui.vm
+    vm: state.scratchGui.vm,
+    customStageSize: state.scratchGui.customStageSize
 });
 const mapDispatchToProps = dispatch => ({
     addMonitorRect: (id, rect, savePosition) =>

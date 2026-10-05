@@ -1,11 +1,17 @@
 import PropTypes from 'prop-types';
-import React from 'react';
+import React, {useState, useEffect} from 'react';
 import Modal from '../../containers/modal.jsx';
 import Box from '../box/box.jsx';
+import FancyCheckbox from '../tw-fancy-checkbox/checkbox.jsx';
 import {defineMessages, injectIntl, intlShape, FormattedMessage} from 'react-intl';
 
 import booleanInputIcon from './icon--boolean-input.svg';
+import objectInputIcon from './icon--object-input.svg';
+import arrayInputIcon from './icon--array-input.svg';
+import colorInputIcon from './icon--color-input.svg';
 import textInputIcon from './icon--text-input.svg';
+import dropdownInputIcon from './icon--dropdown.svg';
+import branchIcon from './icon--branch.svg';
 import labelIcon from './icon--label.svg';
 
 import styles from './custom-procedures.css';
@@ -18,141 +24,349 @@ const messages = defineMessages({
     }
 });
 
-const CustomProcedures = props => (
-    <Modal
-        className={styles.modalContent}
-        contentLabel={props.intl.formatMessage(messages.myblockModalTitle)}
-        onRequestClose={props.onCancel}
-        id="customProceduresModal"
-    >
-        <Box
-            className={styles.workspace}
-            componentRef={props.componentRef}
-        />
-        <Box className={styles.body}>
-            <div className={styles.optionsRow}>
-                <div
-                    className={styles.optionCard}
-                    role="button"
-                    tabIndex="0"
-                    onClick={props.onAddTextNumber}
-                >
-                    <img
-                        className={styles.optionIcon}
-                        src={textInputIcon}
-                        draggable={false}
-                    />
-                    <div className={styles.optionTitle}>
-                        <FormattedMessage
-                            defaultMessage="Add an input"
-                            description="Label for button to add a number/text input"
-                            id="gui.customProcedures.addAnInputNumberText"
+const CustomProcedures = props => {
+    const [inputIcon, setInputIcon] = useState(textInputIcon);
+    useEffect(() => {
+        switch (props.menuOption) {
+        case 'stringornumber': // To be split up as string and number types on a later date
+            setInputIcon(textInputIcon);
+            break;
+        case 'boolean':
+            setInputIcon(booleanInputIcon);
+            break;
+        case 'object':
+            setInputIcon(objectInputIcon);
+            break;
+        case 'array':
+            setInputIcon(arrayInputIcon);
+            break;
+        case 'color':
+            setInputIcon(colorInputIcon);
+            break;
+        }
+    }, [props.menuOption]);
+
+    return (
+        <Modal
+            className={styles.modalContent}
+            contentLabel={props.intl.formatMessage(messages.myblockModalTitle)}
+            onRequestClose={props.onCancel}
+            id="customProceduresModal"
+        >
+            <Box
+                className={styles.workspace}
+                componentRef={props.componentRef}
+            />
+            <Box className={styles.body}>
+                <div className={styles.optionsRow}>
+                    <div
+                        className={styles.optionCard}
+                        role="button"
+                        tabIndex="0"
+                        onClick={props.onAddInput}
+                    >
+                        <img
+                            className={styles.optionIcon}
+                            src={inputIcon}
+                            draggable={false}
                         />
+                        <div className={styles.optionTitle}>
+                            <FormattedMessage
+                                defaultMessage="Add an input"
+                                description="Label for button to add a input"
+                                id="gui.customProcedures.addAnInput"
+                            />
+                        </div>
+                        <select
+                            className={styles.optionMenu}
+                            onClick={props.onInputMenuClick}
+                            onChange={props.onInputMenuChange}
+                        >
+                            <option value="stringornumber">{'number or text'}</option>
+                            <option value="boolean">{'boolean'}</option>
+                            <option value="object">{'object'}</option>
+                            <option value="array">{'array'}</option>
+                            <option value="color">{'color'}</option>
+                        </select>
                     </div>
-                    <div className={styles.optionDescription}>
-                        <FormattedMessage
-                            defaultMessage="number or text"
-                            description="Description of the number/text input type"
-                            id="gui.customProcedures.numberTextType"
+                    <div
+                        className={styles.optionCard}
+                        role="button"
+                        tabIndex="0"
+                        onClick={props.onAddDropdown}
+                    >
+                        <img
+                            className={styles.optionIcon}
+                            src={dropdownInputIcon}
+                            draggable={false}
                         />
+                        <div className={styles.optionTitle}>
+                            <FormattedMessage
+                                defaultMessage="Add a dropdown"
+                                description="Label for button to add a dropdown"
+                                id="gui.customProcedures.addADropdown"
+                            />
+                        </div>
+                    </div>
+                    <div
+                        className={styles.optionCard}
+                        role="button"
+                        tabIndex="0"
+                        onClick={props.onAddBranch}
+                    >
+                        <img
+                            className={styles.optionIcon}
+                            src={branchIcon}
+                            draggable={false}
+                        />
+                        <div className={styles.optionTitle}>
+                            <FormattedMessage
+                                defaultMessage="Add a branch"
+                                description="Label for button to add a branch"
+                                id="gui.customProcedures.addABranch"
+                            />
+                        </div>
+                    </div>
+                    <div
+                        className={styles.optionCard}
+                        role="button"
+                        tabIndex="0"
+                        onClick={props.onAddLabel}
+                    >
+                        <img
+                            className={styles.optionIcon}
+                            src={labelIcon}
+                            draggable={false}
+                        />
+                        <div className={styles.optionTitle}>
+                            <FormattedMessage
+                                defaultMessage="Add a label"
+                                description="Label for button to add a label"
+                                id="gui.customProcedures.addALabel"
+                            />
+                        </div>
                     </div>
                 </div>
-                <div
-                    className={styles.optionCard}
-                    role="button"
-                    tabIndex="0"
-                    onClick={props.onAddBoolean}
-                >
-                    <img
-                        className={styles.optionIcon}
-                        src={booleanInputIcon}
-                        draggable={false}
+                <br />
+                <div className={styles.sectionTitle}>
+                    <FormattedMessage
+                        defaultMessage="Select a color"
+                        description="Label for row of color options"
+                        id="gui.customProcedures.selectAColorText"
                     />
-                    <div className={styles.optionTitle}>
-                        <FormattedMessage
-                            defaultMessage="Add an input"
-                            description="Label for button to add a boolean input"
-                            id="gui.customProcedures.addAnInputBoolean"
-                        />
-                    </div>
-                    <div className={styles.optionDescription}>
-                        <FormattedMessage
-                            defaultMessage="boolean"
-                            description="Description of the boolean input type"
-                            id="gui.customProcedures.booleanType"
-                        />
-                    </div>
                 </div>
-                <div
-                    className={styles.optionCard}
-                    role="button"
-                    tabIndex="0"
-                    onClick={props.onAddLabel}
-                >
-                    <img
-                        className={styles.optionIcon}
-                        src={labelIcon}
+                <Box className={styles.colorRow}>
+                    <span
+                        style={{backgroundColor: '#FF6680'}}
+                        className={styles.colorOption}
+                        role="button"
+                        color="#FF6680"
                         draggable={false}
+                        onClick={props.onSetColor}
                     />
-                    <div className={styles.optionTitle}>
-                        <FormattedMessage
-                            defaultMessage="Add a label"
-                            description="Label for button to add a label"
-                            id="gui.customProcedures.addALabel"
-                        />
-                    </div>
-                </div>
-            </div>
-            <div className={styles.checkboxRow}>
-                <label>
+                    <span
+                        style={{backgroundColor: '#4C97FF'}}
+                        className={styles.colorOption}
+                        role="button"
+                        color="#4C97FF"
+                        draggable={false}
+                        onClick={props.onSetColor}
+                    />
+                    <span
+                        style={{backgroundColor: '#9966FF'}}
+                        className={styles.colorOption}
+                        role="button"
+                        color="#9966FF"
+                        draggable={false}
+                        onClick={props.onSetColor}
+                    />
+                    <span
+                        style={{backgroundColor: '#CF63CF'}}
+                        className={styles.colorOption}
+                        role="button"
+                        color="#CF63CF"
+                        draggable={false}
+                        onClick={props.onSetColor}
+                    />
+                    <span
+                        style={{backgroundColor: '#FFBF00'}}
+                        className={styles.colorOption}
+                        role="button"
+                        color="#FFBF00"
+                        draggable={false}
+                        onClick={props.onSetColor}
+                    />
+                    <span
+                        style={{backgroundColor: '#FFAB19'}}
+                        className={styles.colorOption}
+                        role="button"
+                        color="#FFAB19"
+                        draggable={false}
+                        onClick={props.onSetColor}
+                    />
+                    <span
+                        style={{backgroundColor: '#5CB1D6'}}
+                        className={styles.colorOption}
+                        role="button"
+                        color="#5CB1D6"
+                        draggable={false}
+                        onClick={props.onSetColor}
+                    />
+                    <span
+                        style={{backgroundColor: '#59C059'}}
+                        className={styles.colorOption}
+                        role="button"
+                        color="#59C059"
+                        draggable={false}
+                        onClick={props.onSetColor}
+                    />
+                    <span
+                        style={{backgroundColor: '#FF8C1A'}}
+                        className={styles.colorOption}
+                        role="button"
+                        color="#FF8C1A"
+                        draggable={false}
+                        onClick={props.onSetColor}
+                    />
+                    <span
+                        style={{backgroundColor: '#FF661A'}}
+                        className={styles.colorOption}
+                        role="button"
+                        color="#FF661A"
+                        draggable={false}
+                        onClick={props.onSetColor}
+                    />
+                    <span
+                        style={{backgroundColor: '#66BD5C'}}
+                        className={styles.colorOption}
+                        role="button"
+                        color="#66BD5C"
+                        draggable={false}
+                        onClick={props.onSetColor}
+                    />
+                    <span
+                        style={{backgroundColor: '#5755D4'}}
+                        className={styles.colorOption}
+                        role="button"
+                        color="#5755D4"
+                        draggable={false}
+                        onClick={props.onSetColor}
+                    />
                     <input
-                        checked={props.warp}
-                        type="checkbox"
-                        onChange={props.onToggleWarp}
+                        style={{backgroundColor: props.colour}}
+                        type="color"
+                        value={props.colour}
+                        className={styles.colorPicker}
+                        onChange={props.onSetColor}
                     />
-                    <FormattedMessage
-                        defaultMessage="Run without screen refresh"
-                        description="Label for checkbox to run without screen refresh"
-                        id="gui.customProcedures.runWithoutScreenRefresh"
-                    />
-                </label>
-            </div>
-            <Box className={styles.buttonRow}>
-                <button
-                    className={styles.cancelButton}
-                    onClick={props.onCancel}
-                >
-                    <FormattedMessage
-                        defaultMessage="Cancel"
-                        description="Label for button to cancel custom procedure edits"
-                        id="gui.customProcedures.cancel"
-                    />
-                </button>
-                <button
-                    className={styles.okButton}
-                    onClick={props.onOk}
-                >
-                    <FormattedMessage
-                        defaultMessage="OK"
-                        description="Label for button to save new custom procedure"
-                        id="gui.customProcedures.ok"
-                    />
-                </button>
+                </Box>
+                <div className={styles.checkboxRow}>
+                    <label>
+                        <FancyCheckbox
+                            checked={props.warp}
+                            onChange={props.onToggleWarp}
+                        />
+                        <FormattedMessage
+                            defaultMessage="Run without screen refresh"
+                            description="Label for checkbox to run without screen refresh"
+                            id="gui.customProcedures.runWithoutScreenRefresh"
+                        />
+                    </label>
+                </div>
+                <div className={styles.checkboxRow}>
+                    <label>
+                        <FancyCheckbox
+                            checked={props.global}
+                            onChange={props.onToggleGlobal}
+                        />
+                        <FormattedMessage
+                            defaultMessage="For all sprites"
+                            description="Label for checkbox to toggle availability for all sprites"
+                            id="gui.customProcedures.forAllSprites"
+                        />
+                    </label>
+                </div>
+                <div className={styles.outputRow}>
+                    <label>
+                        <FormattedMessage
+                            defaultMessage="Output:"
+                            description="Label for custom procedure output type menu"
+                            id="gui.customProcedures.output"
+                        />
+                    </label>
+                    <select
+                        value={props.outputMode}
+                        onChange={props.onOutputMenuChange}
+                    >
+                        <option value="auto">{'Auto'}</option>
+                        <option value="reporter">{'Reporter'}</option>
+                        <option value="boolean">{'Boolean'}</option>
+                        <option value="object">{'Object'}</option>
+                        <option value="array">{'Array'}</option>
+                    </select>
+                    {props.outputMode !== 'auto' && (
+                        <label>
+                            <FancyCheckbox
+                                checked={props.dual}
+                                onChange={props.onToggleDual}
+                            />
+                            <FormattedMessage
+                                defaultMessage="Dual block"
+                                description="Label for checkbox to make a custom procedure both a reporter and command"
+                                id="gui.customProcedures.dualBlock"
+                            />
+                        </label>
+                    )}
+                </div>
+                <Box className={styles.buttonRow}>
+                    <button
+                        className={styles.cancelButton}
+                        onClick={props.onCancel}
+                    >
+                        <FormattedMessage
+                            defaultMessage="Cancel"
+                            description="Label for button to cancel custom procedure edits"
+                            id="gui.customProcedures.cancel"
+                        />
+                    </button>
+                    <button
+                        className={styles.okButton}
+                        onClick={props.onOk}
+                    >
+                        <FormattedMessage
+                            defaultMessage="OK"
+                            description="Label for button to save new custom procedure"
+                            id="gui.customProcedures.ok"
+                        />
+                    </button>
+                </Box>
             </Box>
-        </Box>
-    </Modal>
-);
+        </Modal>
+    );
+};
 
 CustomProcedures.propTypes = {
     componentRef: PropTypes.func.isRequired,
+    colour: PropTypes.string.isRequired,
     intl: intlShape,
-    onAddBoolean: PropTypes.func.isRequired,
+    onAddInput: PropTypes.func.isRequired,
+    onAddDropdown: PropTypes.func.isRequired,
+    onAddBranch: PropTypes.func.isRequired,
     onAddLabel: PropTypes.func.isRequired,
-    onAddTextNumber: PropTypes.func.isRequired,
+    menuOption: PropTypes.string.isRequired,
+    onInputMenuClick: PropTypes.func.isRequired,
+    onInputMenuChange: PropTypes.func.isRequired,
+    onOutputMenuChange: PropTypes.func.isRequired,
     onCancel: PropTypes.func.isRequired,
     onOk: PropTypes.func.isRequired,
     onToggleWarp: PropTypes.func.isRequired,
-    warp: PropTypes.bool.isRequired
+    warp: PropTypes.bool.isRequired,
+    onToggleGlobal: PropTypes.func.isRequired,
+    global: PropTypes.bool.isRequired,
+    onToggleDual: PropTypes.func.isRequired,
+    onSetColor: PropTypes.func.isRequired,
+    dual: PropTypes.bool.isRequired,
+    outputMode: PropTypes.oneOf(['auto', 'reporter', 'boolean', 'object', 'array']).isRequired
 };
 
 export default injectIntl(CustomProcedures);

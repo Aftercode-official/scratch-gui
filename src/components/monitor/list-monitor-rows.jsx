@@ -8,7 +8,7 @@ import styles from './monitor.css';
 import {List} from 'react-virtualized';
 import {safeStringify} from '../../lib/tw-safe-stringify.js';
 
-class ListMonitorScroller extends React.Component {
+class ListMonitorRows extends React.Component {
     constructor (props) {
         super(props);
         bindAll(this, [
@@ -38,7 +38,7 @@ class ListMonitorScroller extends React.Component {
                 key={key}
                 style={style}
             >
-                <div className={styles.listIndex}>{index + 1 /* one indexed */}</div>
+                <div className={styles.listIndex}>{index + 1}</div>
                 <div
                     className={styles.listValue}
                     dataIndex={index}
@@ -61,16 +61,15 @@ class ListMonitorScroller extends React.Component {
                                 onBlur={this.props.onDeactivate}
                                 onChange={this.props.onInput}
                                 onFocus={this.props.onFocus}
-                                onKeyDown={this.props.onKeyPress} // key down to get ahead of blur
+                                onKeyDown={this.props.onKeyPress}
                             />
                             <div
                                 className={styles.removeButton}
-                                onMouseDown={this.props.onRemove} // mousedown to get ahead of blur
+                                onMouseDown={this.props.onRemove}
                             >
                                 {'✖︎'}
                             </div>
                         </div>
-
                     ) : (
                         <div className={styles.valueInner}>
                             {safeStringify(this.props.values[index])}
@@ -81,19 +80,18 @@ class ListMonitorScroller extends React.Component {
         );
     }
     render () {
-        const {height, values, width, activeIndex, activeValue} = this.props;
-        // Keep the active index in view if defined, else must be undefined for List component
-        const scrollToIndex = activeIndex === null ? undefined : activeIndex; /* eslint-disable-line no-undefined */
+        const {height, values, width, activeIndex} = this.props;
+        const scrollToIndex = activeIndex === null ? undefined : activeIndex; // eslint-disable-line no-undefined
         return (
             <List
                 activeIndex={activeIndex}
-                activeValue={activeValue}
-                height={(height) - 42 /* Header/footer size, approx */}
+                activeValue={this.props.activeValue}
+                height={height - 42}
                 noRowsRenderer={this.noRowsRenderer}
                 rowCount={values.length}
-                rowHeight={24 /* Row size is same for all rows */}
+                rowHeight={24}
                 rowRenderer={this.rowRenderer}
-                scrollToIndex={scrollToIndex} /* eslint-disable-line no-undefined */
+                scrollToIndex={scrollToIndex} // eslint-disable-line no-undefined
                 values={values}
                 width={width}
             />
@@ -101,7 +99,7 @@ class ListMonitorScroller extends React.Component {
     }
 }
 
-ListMonitorScroller.propTypes = {
+ListMonitorRows.propTypes = {
     activeIndex: PropTypes.number,
     activeValue: PropTypes.string,
     categoryColor: PropTypes.shape({
@@ -122,4 +120,5 @@ ListMonitorScroller.propTypes = {
     ])),
     width: PropTypes.number
 };
-export default ListMonitorScroller;
+
+export default ListMonitorRows;

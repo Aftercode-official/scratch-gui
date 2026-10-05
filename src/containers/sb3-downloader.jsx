@@ -5,6 +5,7 @@ import {connect} from 'react-redux';
 import {projectTitleInitialState, setProjectTitle} from '../reducers/project-title';
 import downloadBlob from '../lib/download-blob';
 import {setProjectUnchanged} from '../reducers/project-changed';
+import {createProjectBlob, createProjectStream} from '../lib/project-assets';
 import {showStandardAlert, showAlertWithTimeout} from '../reducers/alerts';
 import {setFileHandle} from '../reducers/tw';
 import {getIsShowingProject} from '../reducers/project-state';
@@ -138,12 +139,11 @@ class SB3Downloader extends React.Component {
 
         const writable = await handle.createWritable();
         this.startedSaving();
+        const jszipStream = await this.props.saveProjectSb3Stream();
 
         await new Promise((resolve, reject) => {
             // Projects can be very large, so we'll utilize JSZip's stream API to avoid having the
             // entire sb3 in memory at the same time.
-            const jszipStream = this.props.saveProjectSb3Stream();
-
             const abortController = new AbortController();
             jszipStream.on('error', error => {
                 abortController.abort(error);
@@ -302,8 +302,12 @@ SB3Downloader.defaultProps = {
 
 const mapStateToProps = state => ({
     fileHandle: state.scratchGui.tw.fileHandle,
-    saveProjectSb3: state.scratchGui.vm.saveProjectSb3.bind(state.scratchGui.vm),
-    saveProjectSb3Stream: state.scratchGui.vm.saveProjectSb3Stream.bind(state.scratchGui.vm),
+    saveProjectSb3: state.scratchGui.projectAssets.length ?
+        () => createProjectBlob(state.scratchGui.vm, state.scratchGui.projectAssets) :
+        state.scratchGui.vm.saveProjectSb3.bind(state.scratchGui.vm),
+    saveProjectSb3Stream: state.scratchGui.projectAssets.length ?
+        () => createProjectStream(state.scratchGui.vm, state.scratchGui.projectAssets) :
+        state.scratchGui.vm.saveProjectSb3Stream.bind(state.scratchGui.vm),
     canSaveProject: getIsShowingProject(state.scratchGui.projectState.loadingState),
     projectFilename: getProjectFilename(state.scratchGui.projectTitle, projectTitleInitialState)
 });
