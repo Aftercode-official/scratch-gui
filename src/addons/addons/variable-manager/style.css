@@ -14,6 +14,9 @@
 [class*="gui_tab_"]:nth-of-type(4) {
   z-index: 6;
 }
+[class*="gui_tab_"]:nth-of-type(5) {
+  z-index: 5;
+}
 
 .sa-var-manager {
   display: block;

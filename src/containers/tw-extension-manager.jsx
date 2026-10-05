@@ -35,7 +35,7 @@ class ExtensionManager extends React.Component {
 
     handleRemove (extensionId) {
         try {
-            this.props.vm.extensionManager.unloadExtension(extensionId);
+            this.props.vm.extensionManager.removeExtension(extensionId);
             this.props.vm.refreshWorkspace();
             this.handleRefresh();
         } catch (error) {
@@ -45,7 +45,11 @@ class ExtensionManager extends React.Component {
 
     handleRemoveAll () {
         try {
-            this.props.vm.extensionManager.unloadAllExtensions();
+            const extensionManager = this.props.vm.extensionManager;
+            const extensionIds = Object.keys(extensionManager.getExtensionURLs());
+            extensionIds.forEach(extensionId => {
+                extensionManager.removeExtension(extensionId);
+            });
             this.props.vm.refreshWorkspace();
             this.handleRefresh();
         } catch (error) {
@@ -72,8 +76,7 @@ ExtensionManager.propTypes = {
     vm: PropTypes.shape({
         extensionManager: PropTypes.shape({
             getExtensionURLs: PropTypes.func,
-            unloadAllExtensions: PropTypes.func,
-            unloadExtension: PropTypes.func
+            removeExtension: PropTypes.func
         })
     })
 };
