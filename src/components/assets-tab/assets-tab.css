@@ -1,113 +1,147 @@
 @import "../../css/colors.css";
 @import "../../css/units.css";
 
-.wrapper {
+.viewer-container {
     display: flex;
-    width: 100%;
-    min-width: 0;
-    height: 100%;
-    background: $ui-white;
+    flex-direction: column;
+    flex-grow: 1;
+    padding: calc(2 * $space);
+    align-items: center;
+    justify-items: center
 }
 
-.sidebar {
+.text-mode {
+    width: 100%;
+    min-height: 0;
+    align-items: stretch;
+}
+
+.attribute {
+    margin: $space;
+}
+
+.attribute span {
+    font-size: 0.75rem;
+}
+
+.media-preview {
+    max-height: calc(50 * $space);
+    border-radius: 0.25rem;
+    margin: 1rem
+}
+
+.editor-header-row {
+    display: flex;
+    align-items: center;
+    width: 100%;
+}
+
+.editor-surface {
+    width: 100%;
+    min-height: 12rem;
+    flex: 1 1 auto;
+    margin-top: calc(2 * $space);
+    border: 1px solid $ui-black-transparent;
+    border-radius: 0.25rem;
+    overflow: hidden;
+}
+
+.info-row {
+    margin-top: $space;
+    width: 100%;
+    display: flex;
+    justify-content: flex-start;
+}
+
+[dir="ltr"] .info-row .attribute + .attribute {
+    margin-left: calc(2 * $space);
+}
+
+[dir="rtl"] .info-row .attribute + .attribute {
+    margin-right: calc(2 * $space);
+}
+
+.input-group {
+    display: flex;
+    align-items: center;
+}
+
+.name-input {
+    min-width: 20rem;
+}
+
+[dir="ltr"] .button-group {
+    margin-left: 1rem;
+}
+
+[dir="rtl"] .button-group {
+    margin-right: 1rem;
+}
+
+.button-group {
+    display: flex;
+}
+
+.button {
+    height: 2rem;
+    padding: 0.35rem;
+    outline: none;
+    background: $ui-white;
+    border-radius: 0;
+    border: 1px solid $ui-black-transparent;
+    cursor: pointer;
+    font-size: 0.85rem;
+    user-select: none;
+    margin: 0;
     position: relative;
-    display: flex;
-    flex: 0 0 150px;
-    flex-direction: column;
-    background: $ui-tertiary;
-    overflow: hidden;
 }
 
-.asset-list {
-    flex: 1;
-    min-height: 0;
-    overflow-y: auto;
+.button:not(:last-child) {
+    border-right: none;
 }
 
-.asset-item {
-    display: block;
-    width: calc(100% - 1rem);
-    margin: 0.5rem;
-    padding: 0.625rem;
-    overflow: hidden;
-    border: 1px solid transparent;
-    border-radius: 0.5rem;
-    background: $ui-white;
-    color: $text-primary;
-    text-align: left;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    cursor: pointer;
+[dir="rtl"] .button:not(:last-child) {
+    border-left: none;
+    border-right: 1px solid $ui-black-transparent;
 }
 
-.asset-item.selected {
-    border-color: $looks-secondary;
+.button-group .button:first-child,
+[dir="rtl"] .button-group .button:last-child {
+    border-radius: $form-radius 0 0 $form-radius;
 }
 
-.actions {
+.button-group .button:last-child,
+[dir="rtl"] .button-group .button:first-child {
+    border-radius: 0 $form-radius $form-radius 0;
+}
+
+.button:active:not(:disabled) {
+    background: $looks-transparent;
+}
+
+.button:focus::before {
+    content: "";
     position: absolute;
-    right: 0.75rem;
-    bottom: 0.75rem;
-    z-index: 2;
+    top: -1px;
+    right: -1px;
+    bottom: -1px;
+    left: -1px;
+    border: 1px solid $looks-secondary;
+    z-index: 1;
 }
 
-.delete-button {
-    padding: 0.5rem;
-    border: 1px solid $ui-black-transparent;
-    border-radius: 0.5rem;
-    background: $ui-white;
-    color: $text-primary;
-    cursor: pointer;
-}
-
-.detail {
-    display: flex;
-    flex: 1;
-    flex-direction: column;
-    min-width: 0;
-    min-height: 0;
-    padding: 1rem;
-    gap: 0.75rem;
-}
-
-.filename {
-    width: min(100%, 28rem);
-    padding: 0.5rem;
-    border: 1px solid $ui-black-transparent;
-    border-radius: 0.25rem;
-    color: $text-primary;
-    font: inherit;
-}
-
-.editor {
-    flex: 1;
-    width: 100%;
-    min-height: 0;
-    padding: 0.75rem;
-    resize: none;
-    border: 1px solid $ui-black-transparent;
-    border-radius: 0.25rem;
-    color: $text-primary;
-    font: 0.9rem/1.5 monospace;
-}
-
-.image {
+.button > img {
+    flex-grow: 1;
     max-width: 100%;
     max-height: 100%;
-    object-fit: contain;
+    min-width: 1.25rem;
 }
 
-.image-wrapper,
-.empty {
-    display: flex;
-    flex: 1;
-    min-height: 0;
-    align-items: center;
-    justify-content: center;
-    overflow: auto;
-    color: $text-primary-transparent;
+[dir="rtl"] .undo-icon,
+[dir="rtl"] .redo-icon {
+    transform: scaleX(-1);
 }
 
-.delete-button {
-    align-self: flex-start;
+.button:disabled > img {
+    opacity: 0.25;
 }

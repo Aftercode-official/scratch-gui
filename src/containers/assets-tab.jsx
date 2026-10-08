@@ -11,9 +11,15 @@ const AssetsTab = props => {
     const {assets, onChangeAssets} = props;
 
     const addText = () => {
+        const highestNumber = assets.reduce((highest, asset) => {
+            const match = /^Untitled(\d*)\.txt$/i.exec(asset.name);
+            if (!match) return highest;
+            return Math.max(highest, match[1] ? Number(match[1]) : 0);
+        }, 0);
+        const name = `Untitled${highestNumber + 1}.txt`;
         const asset = {
             id: createId(),
-            name: 'Untitled.txt',
+            name,
             type: 'text',
             content: '',
             scopeId: props.editingTarget,
@@ -24,12 +30,13 @@ const AssetsTab = props => {
     };
 
     const importFile = file => new Promise((resolve, reject) => {
-        const extension = file.name.split('.').pop().toLowerCase();
-        const type = extension === 'png' ? 'image' : extension === 'txt' ? 'text' : null;
-        if (!type || (type === 'image' && file.type && file.type !== 'image/png')) {
-            reject(new Error('Only PNG images and plain text files are supported.'));
-            return;
-        }
+        const extensionMatch = /\.([^.]+)$/.exec(file.name);
+        const extension = extensionMatch ? extensionMatch[1].toLowerCase() : '';
+        const isImage = (file.type && file.type.startsWith('image/')) ||
+            /^(png|jpe?g|gif|webp|bmp|svg|avif|ico)$/.test(extension);
+        const type = isImage ? 'image' : 'text';
+        const name = type === 'text' && !/\.txt$/i.test(file.name) ?
+            `${file.name}.txt` : file.name;
 
         const reader = new FileReader();
         reader.onerror = () => {
@@ -38,7 +45,7 @@ const AssetsTab = props => {
         reader.onload = () => {
             const asset = {
                 id: createId(),
-                name: file.name,
+                name,
                 type,
                 content: reader.result,
                 scopeId: props.editingTarget,
@@ -64,12 +71,19 @@ const AssetsTab = props => {
         onChangeAssets(assets.filter(asset => asset.id !== id));
     };
 
+    const reorderAssets = (oldIndex, newIndex) => {
+        const reorderedAssets = assets.slice();
+        reorderedAssets.splice(newIndex, 0, reorderedAssets.splice(oldIndex, 1)[0]);
+        onChangeAssets(reorderedAssets);
+    };
+
     return (
         <AssetsTabComponent
             assets={assets}
             onAddText={addText}
             onDelete={deleteAsset}
             onImport={importFile}
+            onReorder={reorderAssets}
             onUpdate={updateAsset}
         />
     );
