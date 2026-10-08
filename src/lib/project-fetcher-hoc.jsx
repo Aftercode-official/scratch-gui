@@ -54,6 +54,15 @@ const fetchProjectToken = async projectId => {
     }
 };
 
+const loadProjectById = projectId => fetchProjectToken(projectId)
+    .then(token => {
+        storage.setProjectToken(token);
+        return storage.load(storage.AssetType.Project, projectId, storage.DataFormat.JSON)
+            .catch(err => {
+                throw new ProjectFetchError(`Could not load project: ${err}`);
+            });
+    });
+
 /* Higher Order Component to provide behavior for loading projects by id. If
  * there's no id, the default project is loaded.
  * @param {React.Component} WrappedComponent component to receive projectData prop
@@ -124,11 +133,7 @@ const ProjectFetcherHOC = function (WrappedComponent) {
                 }
                 const scratchProjectId = getScratchProjectIdFromUrl(projectUrl);
                 if (scratchProjectId) {
-                    assetPromise = storage.load(
-                        storage.AssetType.Project,
-                        scratchProjectId,
-                        storage.DataFormat.JSON
-                    );
+                    assetPromise = loadProjectById(scratchProjectId);
                 } else {
                     assetPromise = fetch(projectUrl)
                         .then(r => {
@@ -141,14 +146,7 @@ const ProjectFetcherHOC = function (WrappedComponent) {
                 }
             } else {
                 // TW: Temporary hack for project tokens
-                assetPromise = fetchProjectToken(projectId)
-                    .then(token => {
-                        storage.setProjectToken(token);
-                        return storage.load(storage.AssetType.Project, projectId, storage.DataFormat.JSON)
-                            .catch(err => {
-                                throw new ProjectFetchError(`Could not load project: ${err}`);
-                            });
-                    });
+                assetPromise = loadProjectById(projectId);
             }
 
             return assetPromise
