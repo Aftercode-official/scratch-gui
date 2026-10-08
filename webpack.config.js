@@ -23,15 +23,22 @@ if (root.length > 0 && !root.endsWith('/')) {
 const localScratchPaintPath = path.resolve(__dirname, 'scratch-paint');
 const localScratchPaintEntry = path.join(localScratchPaintPath, 'src', 'index.js');
 const hasLocalScratchPaint = fs.existsSync(localScratchPaintEntry);
+const localScratchVMEntry = path.join(__dirname, 'scratch-vm', 'src', 'index.js');
+const hasLocalScratchVM = fs.existsSync(localScratchVMEntry);
+const nestedHtmlParserPath = path.join(__dirname, 'node_modules', 'scratch-vm', 'node_modules', 'htmlparser2');
 const localScratchBlocksPath = path.resolve(__dirname, 'Aftercode-blocks');
 const localScratchBlocksEntry = path.join(localScratchBlocksPath, 'dist', 'blocks.js');
 const hasLocalScratchBlocks = fs.existsSync(localScratchBlocksEntry);
 const aliases = {
-    'scratch-vm$': path.resolve(process.cwd(), 'scratch-vm/src/index.js'),
-    'htmlparser2$': path.resolve(process.cwd(), 'node_modules/scratch-vm/node_modules/htmlparser2'),
     'text-encoding$': path.resolve(__dirname, 'src/lib/tw-text-encoder'),
     'scratch-render-fonts$': path.resolve(__dirname, 'src/lib/tw-scratch-render-fonts')
 };
+if (hasLocalScratchVM) {
+    aliases['scratch-vm$'] = localScratchVMEntry;
+}
+if (fs.existsSync(nestedHtmlParserPath)) {
+    aliases['htmlparser2$'] = nestedHtmlParserPath;
+}
 if (hasLocalScratchPaint) {
     aliases['scratch-paint$'] = localScratchPaintEntry;
     aliases['scratch-paint/src'] = path.join(localScratchPaintPath, 'src');
