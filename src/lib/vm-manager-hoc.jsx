@@ -73,17 +73,6 @@ const vmManagerHOC = function (WrappedComponent) {
     this.props.vm.quit();
     return this.props.vm.loadProject(this.props.projectData)
         .then(async () => {
-            // load extension mặc định
-            const em = this.props.vm.extensionManager;
-            const url = 'https://aftercode-extensions.vercel.app/DANV/WOW-extension.js';
-            try {
-                if (!em.isExtensionURLLoaded(url)) {
-                    await em.loadExtensionURL(url);
-                }
-            } catch (e) {
-                console.error('Không load được extension mặc định:', e);
-            }
-
             this.props.onLoadedProject(this.props.loadingState, this.props.canSave);
             // Wrap in a setTimeout because skin loading in
             // the renderer can be async.

@@ -100,7 +100,6 @@ import aboutIcon from './icon--about.svg';
 import fileIcon from './icon--file.svg';
 import editIcon from './icon--edit.svg';
 import addonsIcon from './addons.svg';
-import DANVwsIcon from './upload-danv.png';
 import errorIcon from './tw-error.svg';
 import advancedIcon from './tw-advanced.svg';
 
@@ -234,8 +233,7 @@ class MenuBar extends React.Component {
             'handleKeyPress',
             'handleRestoreOption',
             'getSaveToComputerHandler',
-            'restoreOptionMessage',
-            'handleClickUploadProject'
+            'restoreOptionMessage'
         ]);
     }
     componentDidMount () {
@@ -396,87 +394,6 @@ class MenuBar extends React.Component {
         }
     }
 
-    //DANV upload project to workshop
-async handleClickUploadProject () {
-    try {
-        // 1. Mở tab trước để trình duyệt không chặn Popup
-        const LOGO_URL = 'https://i.ibb.co/9mhxsQM2/ezgif-1b203d38782d98f9.png';
-        const targetUrl = "https://danvpr.github.io/workshop/#upload";
-        const workshopTab = window.open(targetUrl, "_blank");
-
-        if (!workshopTab) {
-            alert("Vui lòng cho phép mở Pop-up trên trình duyệt!");
-            return;
-        }
-
-        const vm = this.props.vm;
-
-        // 2. Lấy tên tác phẩm
-        const projectTitle = this.props.projectTitle || "Dự án mới";
-
-        // 3. Chụp Thumbnail
-        const thumbDataUrl = await new Promise(resolve => {
-            let isDone = false;
-            const fallbackTimer = setTimeout(() => {
-                if (!isDone) {
-                    isDone = true;
-                    const fallbackCanvas = vm?.renderer?.canvas || document.querySelector('canvas');
-                    resolve(fallbackCanvas ? fallbackCanvas.toDataURL('image/png') : null);
-                }
-            }, 1500);
-
-            try {
-                if (vm && vm.renderer && typeof vm.renderer.requestSnapshot === 'function') {
-                    vm.renderer.requestSnapshot(dataUri => {
-                        if (!isDone) {
-                            isDone = true;
-                            clearTimeout(fallbackTimer);
-                            resolve(dataUri);
-                        }
-                    });
-                    vm.renderer.draw();
-                } else {
-                    clearTimeout(fallbackTimer);
-                    const fallbackCanvas = document.querySelector('canvas');
-                    resolve(fallbackCanvas ? fallbackCanvas.toDataURL('image/png') : null);
-                }
-            } catch (e) {
-                clearTimeout(fallbackTimer);
-                resolve(null);
-            }
-        });
-
-        // 4. Đóng gói file .sb3
-        const sb3Blob = await vm.saveProjectSb3();
-        const sb3ArrayBuffer = await sb3Blob.arrayBuffer();
-
-        // 5. Gửi dữ liệu sang tab Workshop khi sẵn sàng
-        let hasSent = false;
-        const messageListener = event => {
-            if (event.data && event.data.type === "DANV_WORKSHOP_READY" && !hasSent) {
-                hasSent = true;
-                workshopTab.postMessage({
-                    type: "DANV_IMPORT_PROJECT",
-                    title: projectTitle,
-                    sb3Buffer: sb3ArrayBuffer,
-                    fileName: `${projectTitle}.sb3`,
-                    thumbDataUrl: thumbDataUrl
-                }, "*", [sb3ArrayBuffer]);
-                window.removeEventListener("message", messageListener);
-            }
-        };
-        window.addEventListener("message", messageListener);
-
-    } catch (error) {
-        console.error("Lỗi khi xuất file dự án:", error);
-        alert("Không thể đóng gói dự án: " + error.message);
-    }
-}
-    handleReturnHomePage(){
-        const Return = "https://danvpr.github.io/workshop/"
-
-        window.location.href = Return;
-    }
     handleClickSeeInside () {
         this.props.onClickSeeInside();
     }
@@ -580,18 +497,6 @@ async handleClickUploadProject () {
                     styles.menuBar
                 )}
             >
-                <div className={styles.menuBarItem}>
-                            <Button
-                                onClick={this.handleReturnHomePage}
-                            >
-                                <img
-                                    src={DANVwsIcon}
-                                    draggable={false}
-                                    width={143.89}
-                                    height={38}
-                                />
-                            </Button>
-                    </div>
                 <div className={styles.mainMenu}>
                     <div className={styles.fileGroup}>
                         {this.props.errors.length > 0 && <div>
@@ -1123,18 +1028,6 @@ async handleClickUploadProject () {
                                 onClick={this.handleClickSeeInside}
                             />
                         ) : []))}
-                    </div>
-                    <div className={styles.menuBarItem}>
-                            <Button
-                            className={styles.uploadProjectButton}
-                                onClick={this.handleClickUploadProject}
-                            >
-                                <FormattedMessage
-                                    defaultMessage="Chia sẻ lên DANVworkshop"
-                                    description="Button to upload a project"
-                                    id="tw.uploadProjectButton"
-                                />
-                            </Button>
                     </div>
                 </div>
 

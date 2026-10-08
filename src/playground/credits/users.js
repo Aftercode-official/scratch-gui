@@ -26,16 +26,6 @@ const DANV = [
         image: `https://trampoline.turbowarp.org/avatars/139855183`,
         href: `https://scratch.mit.edu/users/katboizz/`,
     },
-    {
-        text:'_kitty-the-cat_',
-        image: `https://trampoline.turbowarp.org/avatars/160325509`,
-        href: `https://scratch.mit.edu/users/_kitty-the-cat_/`,
-    },
-    {
-        text:'DANV',
-        image: `https://i.ibb.co/QFg1cVVD/image.png`,
-        href: `https://turbows.pages.dev/users/StudioDANV/`,
-    },
 ];
 
 const Github = [
