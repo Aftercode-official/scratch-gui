@@ -24,6 +24,7 @@ import {
 import log from './log';
 import storage from './storage';
 import {ProjectUnsharedError, ProjectFetchError} from './tw-load-project-error';
+import {getScratchProjectIdFromUrl} from './scratch-project-url';
 
 import VM from 'scratch-vm';
 import {fetchProjectMeta} from './tw-project-meta-fetcher-hoc.jsx';
@@ -121,14 +122,23 @@ const ProjectFetcherHOC = function (WrappedComponent) {
                 ) {
                     projectUrl = `https://${projectUrl}`;
                 }
-                assetPromise = fetch(projectUrl)
-                    .then(r => {
-                        if (!r.ok) {
-                            throw new Error(`Request returned status ${r.status}`);
-                        }
-                        return r.arrayBuffer();
-                    })
-                    .then(buffer => ({data: buffer}));
+                const scratchProjectId = getScratchProjectIdFromUrl(projectUrl);
+                if (scratchProjectId) {
+                    assetPromise = storage.load(
+                        storage.AssetType.Project,
+                        scratchProjectId,
+                        storage.DataFormat.JSON
+                    );
+                } else {
+                    assetPromise = fetch(projectUrl)
+                        .then(r => {
+                            if (!r.ok) {
+                                throw new Error(`Request returned status ${r.status}`);
+                            }
+                            return r.arrayBuffer();
+                        })
+                        .then(buffer => ({data: buffer}));
+                }
             } else {
                 // TW: Temporary hack for project tokens
                 assetPromise = fetchProjectToken(projectId)
