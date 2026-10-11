@@ -5,7 +5,6 @@ import bindAll from 'lodash.bindall';
 import {connect} from 'react-redux';
 
 import {setProjectUnchanged} from '../reducers/project-changed';
-import {setProjectAssets} from '../reducers/project-assets';
 import {
     LoadingStates,
     getIsCreatingNew,
@@ -24,11 +23,9 @@ import {
 import log from './log';
 import storage from './storage';
 import {ProjectUnsharedError, ProjectFetchError} from './tw-load-project-error';
-import {getScratchProjectIdFromUrl} from './scratch-project-url';
 
 import VM from 'scratch-vm';
 import {fetchProjectMeta} from './tw-project-meta-fetcher-hoc.jsx';
-import {getProjectAssets} from './project-assets';
 
 // TW: Temporary hack for project tokens
 const fetchProjectToken = async projectId => {
@@ -53,15 +50,6 @@ const fetchProjectToken = async projectId => {
         throw new ProjectUnsharedError('Cannot access project token. Project is probably unshared. See https://docs.turbowarp.org/unshared-projects');
     }
 };
-
-const loadProjectById = projectId => fetchProjectToken(projectId)
-    .then(token => {
-        storage.setProjectToken(token);
-        return storage.load(storage.AssetType.Project, projectId, storage.DataFormat.JSON)
-            .catch(err => {
-                throw new ProjectFetchError(`Could not load project: ${err}`);
-            });
-    });
 
 /* Higher Order Component to provide behavior for loading projects by id. If
  * there's no id, the default project is loaded.
@@ -131,31 +119,30 @@ const ProjectFetcherHOC = function (WrappedComponent) {
                 ) {
                     projectUrl = `https://${projectUrl}`;
                 }
-                const scratchProjectId = getScratchProjectIdFromUrl(projectUrl);
-                if (scratchProjectId) {
-                    assetPromise = loadProjectById(scratchProjectId);
-                } else {
-                    assetPromise = fetch(projectUrl)
-                        .then(r => {
-                            if (!r.ok) {
-                                throw new Error(`Request returned status ${r.status}`);
-                            }
-                            return r.arrayBuffer();
-                        })
-                        .then(buffer => ({data: buffer}));
-                }
+                assetPromise = fetch(projectUrl)
+                    .then(r => {
+                        if (!r.ok) {
+                            throw new Error(`Request returned status ${r.status}`);
+                        }
+                        return r.arrayBuffer();
+                    })
+                    .then(buffer => ({data: buffer}));
             } else {
                 // TW: Temporary hack for project tokens
-                assetPromise = loadProjectById(projectId);
+                assetPromise = fetchProjectToken(projectId)
+                    .then(token => {
+                        storage.setProjectToken(token);
+                        return storage.load(storage.AssetType.Project, projectId, storage.DataFormat.JSON)
+                            .catch(err => {
+                                throw new ProjectFetchError(`Could not load project: ${err}`);
+                            });
+                    });
             }
 
             return assetPromise
                 .then(projectAsset => {
                     if (projectAsset) {
-                        return getProjectAssets(projectAsset.data).then(assets => {
-                            this.props.onSetProjectAssets(assets);
-                            this.props.onFetchedProjectData(projectAsset.data, loadingState);
-                        });
+                        this.props.onFetchedProjectData(projectAsset.data, loadingState);
                     } else if (projectUrl) {
                         // Treat failure to load as an error
                         // Throw to be caught by catch later on
@@ -212,7 +199,6 @@ const ProjectFetcherHOC = function (WrappedComponent) {
         onError: PropTypes.func,
         onFetchedProjectData: PropTypes.func,
         onProjectUnchanged: PropTypes.func,
-        onSetProjectAssets: PropTypes.func,
         projectHost: PropTypes.string,
         projectToken: PropTypes.string,
         projectId: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
@@ -240,8 +226,7 @@ const ProjectFetcherHOC = function (WrappedComponent) {
         onFetchedProjectData: (projectData, loadingState) =>
             dispatch(onFetchedProjectData(projectData, loadingState)),
         setProjectId: projectId => dispatch(setProjectId(projectId)),
-        onProjectUnchanged: () => dispatch(setProjectUnchanged()),
-        onSetProjectAssets: assets => dispatch(setProjectAssets(assets))
+        onProjectUnchanged: () => dispatch(setProjectUnchanged())
     });
     // Allow incoming props to override redux-provided props. Used to mock in tests.
     const mergeProps = (stateProps, dispatchProps, ownProps) => Object.assign(
