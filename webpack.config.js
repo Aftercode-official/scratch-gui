@@ -1,5 +1,4 @@
 const defaultsDeep = require('lodash.defaultsdeep');
-const fs = require('fs');
 const path = require('path');
 const webpack = require('webpack');
 
@@ -18,34 +17,6 @@ const {APP_NAME} = require('./src/lib/brand');
 const root = process.env.ROOT || '';
 if (root.length > 0 && !root.endsWith('/')) {
     throw new Error('If ROOT is defined, it must have a trailing slash.');
-}
-
-const localScratchPaintPath = path.resolve(__dirname, 'scratch-paint');
-const localScratchPaintEntry = path.join(localScratchPaintPath, 'src', 'index.js');
-const hasLocalScratchPaint = fs.existsSync(localScratchPaintEntry);
-const localScratchVMEntry = path.join(__dirname, 'scratch-vm', 'src', 'index.js');
-const hasLocalScratchVM = fs.existsSync(localScratchVMEntry);
-const nestedHtmlParserPath = path.join(__dirname, 'node_modules', 'scratch-vm', 'node_modules', 'htmlparser2');
-const localScratchBlocksPath = path.resolve(__dirname, 'Aftercode-blocks');
-const localScratchBlocksEntry = path.join(localScratchBlocksPath, 'dist', 'blocks.js');
-const hasLocalScratchBlocks = fs.existsSync(localScratchBlocksEntry);
-const aliases = {
-    'text-encoding$': path.resolve(__dirname, 'src/lib/tw-text-encoder'),
-    'scratch-render-fonts$': path.resolve(__dirname, 'src/lib/tw-scratch-render-fonts')
-};
-if (hasLocalScratchVM) {
-    aliases['scratch-vm$'] = localScratchVMEntry;
-}
-if (fs.existsSync(nestedHtmlParserPath)) {
-    aliases['htmlparser2$'] = nestedHtmlParserPath;
-}
-if (hasLocalScratchPaint) {
-    aliases['scratch-paint$'] = localScratchPaintEntry;
-    aliases['scratch-paint/src'] = path.join(localScratchPaintPath, 'src');
-}
-if (hasLocalScratchBlocks) {
-    aliases['scratch-blocks$'] = localScratchBlocksEntry;
-    aliases['scratch-blocks/msg'] = path.join(localScratchBlocksPath, 'msg');
 }
 
 const htmlWebpackPluginCommon = {
@@ -89,7 +60,10 @@ const base = {
     },
     resolve: {
         symlinks: false,
-        alias: aliases
+        alias: {
+            'text-encoding$': path.resolve(__dirname, 'src/lib/tw-text-encoder'),
+            'scratch-render-fonts$': path.resolve(__dirname, 'src/lib/tw-scratch-render-fonts')
+        }
     },
     module: {
         rules: [{
@@ -97,8 +71,6 @@ const base = {
             loader: 'babel-loader',
             include: [
                 path.resolve(__dirname, 'src'),
-                path.resolve(process.cwd(), 'scratch-vm/src'),
-                ...(hasLocalScratchPaint ? [path.join(localScratchPaintPath, 'src')] : []),
                 /node_modules[\\/]scratch-[^\\/]+[\\/]src/,
                 /node_modules[\\/]pify/,
                 /node_modules[\\/]@vernier[\\/]godirect/
@@ -152,15 +124,6 @@ const base = {
                     from: 'node_modules/scratch-blocks/media',
                     to: 'static/blocks-media/high-contrast'
                 },
-                ...(hasLocalScratchBlocks ? [{
-                    from: path.join(localScratchBlocksPath, 'media'),
-                    to: 'static/blocks-media/default',
-                    force: true
-                }, {
-                    from: path.join(localScratchBlocksPath, 'media'),
-                    to: 'static/blocks-media/high-contrast',
-                    force: true
-                }] : []),
                 {
                     from: 'src/lib/themes/blocks/high-contrast-media/blocks-media',
                     to: 'static/blocks-media/high-contrast',
