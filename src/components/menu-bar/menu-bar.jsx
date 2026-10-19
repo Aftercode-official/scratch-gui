@@ -394,101 +394,82 @@ class MenuBar extends React.Component {
         }
         }
     }
-    async handleClickUploadProject () {
-        try {
-            const targetUrl = "https://turboshare.org.uk/#upload";
-            const workshopTab = window.open(targetUrl, "_blank");
+    //DANV upload project to workshop
+   async handleClickUploadProject () {
+       try {
+           // 1. Mở tab trước để trình duyệt không chặn Popup
+           const LOGO_URL = 'https://i.ibb.co/9mhxsQM2/ezgif-1b203d38782d98f9.png';
+           const targetUrl = "https://danvpr.github.io/workshop/#upload";
+           const workshopTab = window.open(targetUrl, "_blank");
 
-            if (!workshopTab) {
-                alert("Vui lòng cho phép mở Pop-up trên trình duyệt!");
-                return;
-            }
+           if (!workshopTab) {
+               alert("Vui lòng cho phép mở Pop-up trên trình duyệt!");
+               return;
+           }
 
-            const vm = this.props.vm;
-            const projectTitle = this.props.projectTitle || "Dự án mới";
+           const vm = this.props.vm;
 
-            const thumbDataUrl = await new Promise(resolve => {
-                let isDone = false;
-                const fallbackTimer = setTimeout(() => {
-                    if (!isDone) {
-                        isDone = true;
-                        const fallbackCanvas = vm?.renderer?.canvas || document.querySelector('canvas');
-                        resolve(fallbackCanvas ? fallbackCanvas.toDataURL('image/png') : null);
-                    }
-                }, 1500);
+           // 2. Lấy tên tác phẩm
+           const projectTitle = this.props.projectTitle || "Dự án mới";
 
-                try {
-                    if (vm && vm.renderer && typeof vm.renderer.requestSnapshot === 'function') {
-                        vm.renderer.requestSnapshot(dataUri => {
-                            if (!isDone) {
-                                isDone = true;
-                                clearTimeout(fallbackTimer);
-                                resolve(dataUri);
-                            }
-                        });
-                        vm.renderer.draw();
-                    } else {
-                        clearTimeout(fallbackTimer);
-                        const fallbackCanvas = document.querySelector('canvas');
-                        resolve(fallbackCanvas ? fallbackCanvas.toDataURL('image/png') : null);
-                    }
-                } catch (e) {
-                    clearTimeout(fallbackTimer);
-                    resolve(null);
-                }
-            });
+           // 3. Chụp Thumbnail
+           const thumbDataUrl = await new Promise(resolve => {
+               let isDone = false;
+               const fallbackTimer = setTimeout(() => {
+                   if (!isDone) {
+                       isDone = true;
+                       const fallbackCanvas = vm?.renderer?.canvas || document.querySelector('canvas');
+                       resolve(fallbackCanvas ? fallbackCanvas.toDataURL('image/png') : null);
+                   }
+               }, 1500);
 
-            const sb3Blob = await vm.saveProjectSb3();
-            const sb3ArrayBuffer = await sb3Blob.arrayBuffer();
+               try {
+                   if (vm && vm.renderer && typeof vm.renderer.requestSnapshot === 'function') {
+                       vm.renderer.requestSnapshot(dataUri => {
+                           if (!isDone) {
+                               isDone = true;
+                               clearTimeout(fallbackTimer);
+                               resolve(dataUri);
+                           }
+                       });
+                       vm.renderer.draw();
+                   } else {
+                       clearTimeout(fallbackTimer);
+                       const fallbackCanvas = document.querySelector('canvas');
+                       resolve(fallbackCanvas ? fallbackCanvas.toDataURL('image/png') : null);
+                   }
+               } catch (e) {
+                   clearTimeout(fallbackTimer);
+                   resolve(null);
+               }
+           });
 
-            let hasSent = false;
-            let waitTimeout = null;
+           // 4. Đóng gói file .sb3
+           const sb3Blob = await vm.saveProjectSb3();
+           const sb3ArrayBuffer = await sb3Blob.arrayBuffer();
 
-            const cleanup = () => {
-                if (waitTimeout) clearTimeout(waitTimeout);
-                window.removeEventListener("message", messageListener);
-            };
+           // 5. Gửi dữ liệu sang tab Workshop khi sẵn sàng
+           let hasSent = false;
+           const messageListener = event => {
+               if (event.data && event.data.type === "DANV_WORKSHOP_READY" && !hasSent) {
+                   hasSent = true;
+                   workshopTab.postMessage({
+                       type: "DANV_IMPORT_PROJECT",
+                       title: projectTitle,
+                       sb3Buffer: sb3ArrayBuffer,
+                       fileName: `${projectTitle}.sb3`,
+                       thumbDataUrl: thumbDataUrl
+                   }, "*", [sb3ArrayBuffer]);
+                   window.removeEventListener("message", messageListener);
+               }
+           };
+           window.addEventListener("message", messageListener);
 
-            const messageListener = event => {
-                if (event.origin !== "https://turboshare.org.uk") return;
-
-                if (event.data && event.data.type === "DANV_WORKSHOP_READY" && !hasSent) {
-                    hasSent = true;
-                    cleanup();
-
-                    try {
-                        workshopTab.postMessage({
-                            type: "DANV_IMPORT_PROJECT",
-                            title: projectTitle,
-                            sb3Buffer: sb3ArrayBuffer,
-                            fileName: `${projectTitle}.sb3`,
-                            thumbDataUrl: thumbDataUrl
-                        }, "https://turboshare.org.uk");
-                    } catch (postErr) {
-                        console.error("Lỗi khi gửi dữ liệu sang Workshop:", postErr);
-                        alert("Không thể gửi dữ liệu sang tab Turboshare. Vui lòng thử lại!");
-                    }
-                }
-            };
-
-            window.addEventListener("message", messageListener);
-
-            waitTimeout = setTimeout(() => {
-                if (!hasSent) {
-                    hasSent = true;
-                    cleanup();
-                    try {
-                        if (workshopTab && !workshopTab.closed) workshopTab.close();
-                    } catch(e) {}
-                    alert("Turboshare đang gặp sự cố (reCAPTCHA lỗi). Vui lòng thử lại sau hoặc upload thủ công!");
-                }
-            }, 30000);
-
-        } catch (error) {
-            console.error("Lỗi khi xuất file dự án:", error);
-            alert("Không thể đóng gói dự án: " + error.message);
-        }
-    }
+       } catch (error) {
+           console.error("Lỗi khi xuất file dự án:", error);
+           alert("Không thể đóng gói dự án: " + error.message);
+       }
+   }
 
     handleClickSeeInside () {
         this.props.onClickSeeInside();
