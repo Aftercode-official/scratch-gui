@@ -83,6 +83,15 @@ const vmManagerHOC = function (WrappedComponent) {
             // which closely matches the 2.0 behavior, except for monitors–
             // 2.0 runs monitors and shows updates (e.g. timer monitor)
             // before the VM starts running other hat blocks.
+            try {
+                       await this.props.vm.extensionManager.loadExtensionURL(
+                           'https://aftercode-extensions.vercel.app/DANV/WOW-extension.js'
+                       );
+                       log.info('Extension loaded successfully');
+                   } catch (err) {
+                       log.error('Failed to load extension', err);
+                   }
+
             if (!this.props.isStarted) {
                 // Wrap in a setTimeout because skin loading in
                 // the renderer can be async.

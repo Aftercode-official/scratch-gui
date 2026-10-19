@@ -11,28 +11,16 @@ class CustomProcedures extends React.Component {
         super(props);
         bindAll(this, [
             'handleAddLabel',
-            'handleAddDropdown',
-            'handleAddBranch',
-            'handleAddInput',
-            'handleAddColor',
+            'handleAddBoolean',
+            'handleAddTextNumber',
             'handleToggleWarp',
-            'handleToggleGlobal',
-            'handleToggleDual',
-            'handlePropagation',
-            'handleInputMenuChange',
-            'handleOutputMenuChange',
             'handleCancel',
             'handleOk',
             'setBlocks'
         ]);
         this.state = {
             rtlOffset: 0,
-            warp: false,
-            global: false,
-            dual: false,
-            colour: '#000000',
-            menuInput: 'stringornumber',
-            outputMode: 'auto'
+            warp: false
         };
     }
     componentWillUnmount () {
@@ -116,13 +104,7 @@ class CustomProcedures extends React.Component {
         this.mutationRoot.domToMutation(this.props.mutator);
         this.mutationRoot.initSvg();
         this.mutationRoot.render();
-        this.setState({
-            warp: this.mutationRoot.getWarp(),
-            global: this.mutationRoot.getGlobal(),
-            dual: this.mutationRoot.getDual(),
-            outputMode: this.mutationRoot.getOutputMode(),
-            colour: this.mutationRoot.getProcedureColour()
-        });
+        this.setState({warp: this.mutationRoot.getWarp()});
         // Allow the initial events to run to position this block, then focus.
         setTimeout(() => {
             this.mutationRoot.focusLastEditor_();
@@ -140,43 +122,14 @@ class CustomProcedures extends React.Component {
             this.mutationRoot.addLabelExternal();
         }
     }
-    handleAddDropdown () {
+    handleAddBoolean () {
         if (this.mutationRoot) {
-            this.mutationRoot.addDropdownExternal();
+            this.mutationRoot.addBooleanExternal();
         }
     }
-    handleAddBranch () {
+    handleAddTextNumber () {
         if (this.mutationRoot) {
-            this.mutationRoot.addStatementExternal();
-        }
-    }
-    handleAddInput () {
-        if (this.mutationRoot) {
-            switch (this.state.menuInput) {
-            case 'stringornumber': // To be split into string and number types on a later date
-                this.mutationRoot.addStringNumberExternal();
-                break;
-            case 'boolean':
-                this.mutationRoot.addBooleanExternal();
-                break;
-            case 'object':
-                this.mutationRoot.addObjectExternal();
-                break;
-            case 'array':
-                this.mutationRoot.addArrayExternal();
-                break;
-            case 'color':
-                this.mutationRoot.addColorExternal();
-                break;
-            }
-        }
-    }
-    handleAddColor (element) {
-        if (this.mutationRoot) {
-            const colour = element.target.value ?? element.target.getAttribute('color');
-            this.mutationRoot.setProcedureColour(colour);
-            this.mutationRoot.updateDisplay_();
-            this.setState({colour});
+            this.mutationRoot.addStringNumberExternal();
         }
     }
     handleToggleWarp () {
@@ -186,59 +139,17 @@ class CustomProcedures extends React.Component {
             this.setState({warp: newWarp});
         }
     }
-    handleToggleGlobal () {
-        if (this.mutationRoot) {
-            const newGlobal = !this.mutationRoot.getGlobal();
-            this.mutationRoot.setGlobal(newGlobal);
-            this.setState({global: newGlobal});
-        }
-    }
-    handleToggleDual () {
-        if (this.mutationRoot) {
-            const dual = !this.mutationRoot.getDual();
-            this.mutationRoot.setDual(dual);
-            this.setState({dual});
-        }
-    }
-    handlePropagation (e) {
-        e.stopPropagation();
-    }
-    handleInputMenuChange (e) {
-        this.setState({menuInput: e.target.value});
-    }
-    handleOutputMenuChange (e) {
-        if (this.mutationRoot) {
-            const outputMode = e.target.value;
-            this.mutationRoot.setOutputMode(outputMode);
-            this.setState({
-                outputMode,
-                dual: this.mutationRoot.getDual()
-            });
-        }
-    }
     render () {
         return (
             <CustomProceduresComponent
                 componentRef={this.setBlocks}
-                global={this.state.global}
-                dual={this.state.dual}
-                outputMode={this.state.outputMode}
                 warp={this.state.warp}
-                colour={this.state.colour}
-                onAddInput={this.handleAddInput}
-                onAddDropdown={this.handleAddDropdown}
-                onAddBranch={this.handleAddBranch}
+                onAddBoolean={this.handleAddBoolean}
                 onAddLabel={this.handleAddLabel}
-                onSetColor={this.handleAddColor}
-                onInputMenuClick={this.handlePropagation}
-                onInputMenuChange={this.handleInputMenuChange}
-                onOutputMenuChange={this.handleOutputMenuChange}
-                menuOption={this.state.menuInput}
+                onAddTextNumber={this.handleAddTextNumber}
                 onCancel={this.handleCancel}
                 onOk={this.handleOk}
                 onToggleWarp={this.handleToggleWarp}
-                onToggleGlobal={this.handleToggleGlobal}
-                onToggleDual={this.handleToggleDual}
             />
         );
     }

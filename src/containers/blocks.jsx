@@ -505,8 +505,7 @@ class Blocks extends React.Component {
                 this.props.vm.runtime.getBlocksXML(target),
                 this.props.theme
             );
-                return makeToolboxXML(
-                this.props.vm,
+            return makeToolboxXML(
                 false,
                 target.isStage,
                 target.id,
@@ -514,7 +513,6 @@ class Blocks extends React.Component {
                 targetCostumes[targetCostumes.length - 1].name,
                 stageCostumes[stageCostumes.length - 1].name,
                 targetSounds.length > 0 ? targetSounds[targetSounds.length - 1].name : '',
-                '', // assetName
                 this.props.theme.getBlockColors()
             );
         } catch {
